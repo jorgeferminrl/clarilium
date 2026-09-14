@@ -34,6 +34,44 @@ rama dev  →  Pull Request  →  URL de preview automática  →  merge a main 
 Nunca se hace push directo a `main`: todo cambio pasa por un PR y se revisa en su
 URL de preview antes de publicarse.
 
+## Dónde está publicado
+
+El sitio vive en **Azure Static Web Apps**, plan Free (factura 0).
+
+| | |
+|---|---|
+| Recurso | `clarilium-web` |
+| Grupo de recursos | `rg-clarilium-web` |
+| Suscripción | `CLARILIUM-Produccion` |
+| Región de la API | Central US (el contenido estático se sirve desde la red global) |
+| URL temporal | `https://brave-coast-02c410810.6.azurestaticapps.net` |
+
+La URL temporal seguirá funcionando cuando `clarilium.com` apunte aquí; simplemente
+deja de ser la que se comparte.
+
+### Cómo se despliega
+
+Azure escribió `.github/workflows/azure-static-web-apps-brave-coast-02c410810.yml`.
+Ese archivo se dispara con cada push a `main` y con cada Pull Request hacia `main`.
+
+**No hay credencial guardada en el repositorio.** La directiva de autorización es
+*GitHub*, no *Token de implementación*: GitHub y Azure se reconocen en cada despliegue
+mediante identidad federada (la línea `github_id_token` del workflow) y el permiso se
+emite al momento y caduca en minutos. No hay nada que se pueda filtrar porque no hay
+nada almacenado.
+
+### `skip_app_build: true` — por qué está ahí
+
+El primer despliegue falló. Oryx, la herramienta que Azure usa para adivinar cómo
+compilar un repositorio, encontró `api/package.json`, dedujo "esto es una aplicación
+de Node", buscó un script `build` y se detuvo al no encontrarlo.
+
+No lo encuentra porque no debe existir: el sitio es HTML ya generado, no hay nada que
+compilar. `skip_app_build: true` le dice a Oryx que publique los archivos tal cual.
+La función de `api` **sí** se sigue compilando — eso lo controla una opción distinta.
+
+Si alguien quita esa línea, el despliegue vuelve a fallar con el mismo error.
+
 ## Cambiar la tipografía
 
 Están declaradas en dos variables al inicio de `assets/css/styles.css`:
