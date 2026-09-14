@@ -1,0 +1,130 @@
+{
+  "trailingSlash": "auto",
+  "responseOverrides": {
+    "404": {
+      "rewrite": "/404.html"
+    }
+  },
+  "globalHeaders": {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'sha256-JRYj3UQ+xkV0UdeSeKOeh+/6sfX/4fZXugO2uLfyp9w='; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+  },
+  "routes": [
+    {
+      "route": "/servicios",
+      "rewrite": "/servicios.html"
+    },
+    {
+      "route": "/en/services",
+      "rewrite": "/en/services.html"
+    },
+    {
+      "route": "/nosotros",
+      "rewrite": "/nosotros.html"
+    },
+    {
+      "route": "/contacto",
+      "rewrite": "/contacto.html"
+    },
+    {
+      "route": "/en/about",
+      "rewrite": "/en/about.html"
+    },
+    {
+      "route": "/en/contact",
+      "rewrite": "/en/contact.html"
+    },
+    {
+      "route": "/servicios/abap",
+      "rewrite": "/servicios/abap.html"
+    },
+    {
+      "route": "/servicios/fiori",
+      "rewrite": "/servicios/fiori.html"
+    },
+    {
+      "route": "/servicios/sapui5",
+      "rewrite": "/servicios/sapui5.html"
+    },
+    {
+      "route": "/servicios/cloud",
+      "rewrite": "/servicios/cloud.html"
+    },
+    {
+      "route": "/en/services/abap",
+      "rewrite": "/en/services/abap.html"
+    },
+    {
+      "route": "/en/services/fiori",
+      "rewrite": "/en/services/fiori.html"
+    },
+    {
+      "route": "/en/services/sapui5",
+      "rewrite": "/en/services/sapui5.html"
+    },
+    {
+      "route": "/en/services/cloud",
+      "rewrite": "/en/services/cloud.html"
+    },
+    {
+      "route": "/servicios/btp",
+      "rewrite": "/servicios/btp.html"
+    },
+    {
+      "route": "/en/services/btp",
+      "rewrite": "/en/services/btp.html"
+    },
+    {
+      "route": "/servicios/integration-suite",
+      "rewrite": "/servicios/integration-suite.html"
+    },
+    {
+      "route": "/en/services/integration-suite",
+      "rewrite": "/en/services/integration-suite.html"
+    },
+    {
+      "route": "/api/contacto",
+      "methods": [
+        "POST"
+      ],
+      "allowedRoles": [
+        "anonymous"
+      ]
+    },
+    {
+      "route": "/herramientas/*",
+      "statusCode": 404
+    },
+    {
+      "route": "/assets/img/*",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "route": "/assets/css/*",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate"
+      }
+    },
+    {
+      "route": "/assets/js/*",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate"
+      }
+    },
+    {
+      "route": "/inicio",
+      "redirect": "/",
+      "statusCode": 301
+    }
+  ],
+  "mimeTypes": {
+    ".webp": "image/webp",
+    ".json": "application/json"
+  }
+}

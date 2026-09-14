@@ -1,0 +1,13 @@
+{
+  "name": "clarilium-api",
+  "version": "1.0.0",
+  "description": "API del sitio de CLARILIUM (formulario de contacto)",
+  "private": true,
+  "main": "src/functions/*.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@azure/functions": "4.5.1"
+  }
+}

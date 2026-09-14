@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" data-idioma="en" data-otro="../../servicios/btp.html">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SAP BTP Services — CLARILIUM</title>
+<meta name="description" content="SAP BTP services: implementation and rollout, tailored solutions, automation, S/4HANA extensions and artificial intelligence.">
+<link rel="canonical" href="https://clarilium.com/en/services/btp">
+<link rel="alternate" hreflang="es-mx" href="https://clarilium.com/servicios/btp">
+<link rel="alternate" hreflang="en" href="https://clarilium.com/en/services/btp">
+<link rel="alternate" hreflang="x-default" href="https://clarilium.com/servicios/btp">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="CLARILIUM">
+<meta property="og:title" content="SAP BTP Services — CLARILIUM">
+<meta property="og:description" content="SAP BTP services: implementation and rollout, tailored solutions, automation, S/4HANA extensions and artificial intelligence.">
+<meta property="og:url" content="https://clarilium.com/en/services/btp">
+<meta property="og:image" content="https://clarilium.com/assets/img/og-en.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="../../assets/img/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="../../assets/img/apple-touch-icon.png">
+<meta name="theme-color" content="#040814">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700;0,900;1,700&family=Roboto:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/styles.css">
+
+<!-- Tema e idioma: se aplican antes de pintar, para que no haya parpadeo -->
+<script>
+(function () {
+  var raiz = document.documentElement;
+  try {
+    var tema = localStorage.getItem('clarilium-tema');
+    if (tema) raiz.setAttribute('data-tema', tema);
+  } catch (e) {}
+  try {
+    var otro = raiz.getAttribute('data-otro');
+    if (otro) {
+      var esEspanol = raiz.getAttribute('data-idioma') === 'es';
+      var elegido = localStorage.getItem('clarilium-idioma');
+      var param = new URLSearchParams(location.search).get('lang');
+      if (param) { elegido = param; localStorage.setItem('clarilium-idioma', param); }
+      if (!elegido) {
+        var idiomas = navigator.languages || [navigator.language || ''];
+        var hablaEspanol = idiomas.some(function (l) { return /^es/i.test(l); });
+        if (hablaEspanol !== esEspanol) location.replace(otro);
+      } else if (elegido !== (esEspanol ? 'es' : 'en')) {
+        location.replace(otro);
+      }
+    }
+  } catch (e) {}
+})();
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Service",
+  "name": "SAP BTP Services",
+  "serviceType": "SAP BTP",
+  "description": "SAP BTP services: implementation and rollout, tailored solutions, automation, S/4HANA extensions and artificial intelligence.",
+  "url": "https://clarilium.com/en/services/btp",
+  "provider": { "@type": "ProfessionalService", "name": "CLARILIUM", "url": "https://clarilium.com/" },
+  "areaServed": "MX"
+}
+</script>
+</head>
+<body>
+
+<a class="saltar" href="#contenido">Skip to main content</a>
+
+<div class="barra-superior">
+  <div class="cintillo">
+    <div class="contenedor cintillo__inner">
+      <span>We have the best rates and service on the market!</span>
+      <a class="boton-cintillo" href="../../en/contact.html">More information</a>
+    </div>
+  </div>
+
+  <header class="sitio-header">
+    <div class="contenedor sitio-header__inner">
+      <button class="boton-icono nav-toggle" type="button" aria-expanded="false" aria-controls="nav-principal" aria-label="Open menu"><i></i></button>
+
+      <a class="marca" href="../../en/index.html" aria-label="CLARILIUM — home">
+        <img src="../../assets/img/logo-nav-color.png" alt="CLARILIUM" width="900" height="191">
+      </a>
+
+      <nav class="nav" id="nav-principal" aria-label="Main navigation">
+        <button class="nav-cerrar" type="button" aria-label="Close menu">&times;</button>
+
+        <a href="../../en/index.html">Home</a>
+
+        <div class="submenu">
+          <a class="submenu__disparador" href="../../en/services.html" aria-current="page">Services</a>
+          <button class="submenu__flecha" type="button" aria-expanded="false" aria-controls="submenu-servicios" aria-label="Show services">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <ul class="submenu__lista" id="submenu-servicios">
+            <li><a href="../../en/services/abap.html">ABAP</a></li>
+            <li><a href="../../en/services/fiori.html">Fiori</a></li>
+            <li><a href="../../en/services/sapui5.html">SAPUI5</a></li>
+            <li><a href="../../en/services/cloud.html">Cloud</a></li>
+            <li><a href="../../en/services/btp.html" aria-current="page">SAP BTP</a></li>
+            <li><a href="../../en/services/integration-suite.html">SAP CPI</a></li>
+          </ul>
+        </div>
+
+        <a href="../../en/about.html">About</a>
+        <a href="../../en/contact.html">Contact</a>
+      </nav>
+
+      <div class="acciones">
+        <a class="boton-icono" id="btn-idioma" href="../../servicios/btp.html?lang=es" hreflang="es-mx" lang="es-mx"
+           title="Cambiar a español" aria-label="Switch to Spanish">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.5 9h17M3.5 15h17"/><path d="M12 3c2.3 2.4 3.4 5.4 3.4 9s-1.1 6.6-3.4 9c-2.3-2.4-3.4-5.4-3.4-9S9.7 5.4 12 3Z"/></svg>
+          ES
+        </a>
+
+        <button class="boton-icono" id="btn-tema" type="button" aria-label="Switch between light and dark mode" title="Light / dark mode">
+          <svg class="icono-sol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="icono-luna" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+</div>
+
+<div class="velo" id="velo" hidden></div>
+
+<main id="contenido">
+
+  <div class="banda-oscura">
+    <p class="franja">ABAP, Fiori and SAP Cloud Software Factory</p>
+  </div>
+
+  <section class="banda-oscura hero">
+    <a href="../../en/index.html"><img src="../../assets/img/logo-hero-en.png" alt="CLARILIUM — Clear ideas, clear solutions" width="1400" height="305" fetchpriority="high"></a>
+  </section>
+
+  <section class="seccion seccion--alt">
+    <div class="contenedor">
+      <h1 class="centro">SAP BTP Services</h1>
+      <p class="centro entrada">We extend SAP's capabilities to meet your business needs.</p>
+
+      <div class="servicio-detalle">
+        <div class="servicio-detalle__icono">
+          <img src="../../assets/img/tec-btp.webp" alt="SAP BTP" width="420" height="420">
+        </div>
+
+        <ul class="lista-servicios">
+          <li>Implementation and rollout of SAP BTP.</li>
+          <li>Development of tailored enterprise solutions.</li>
+          <li>Automation of tasks and approval flows.</li>
+          <li>Extension of SAP S/4HANA functionality.</li>
+          <li>Adding artificial intelligence to your processes.</li>
+          <li>Support and continuous improvement of BTP solutions.</li>
+        </ul>
+
+        <figure class="aliado">
+          <img src="../../assets/img/aliado.webp" alt="CLARILIUM consultants" width="540" height="527" loading="lazy">
+          <figcaption>We are here to be your best ally</figcaption>
+        </figure>
+      </div>
+
+      <p class="centro cta-contacto">For more information, click the Contact button</p>
+      <p class="centro"><a class="boton" href="../../en/contact.html">Contact</a></p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="sitio-footer">
+  <div class="contenedor">
+    <a href="../../en/index.html"><img src="../../assets/img/logo-hero-en.png" alt="CLARILIUM" width="1400" height="305" loading="lazy"></a>
+    <p class="direccion">Avenida de las Torres Coto 16, Real del Valle,<br>Mazatlán, Sinaloa, Mexico, postal code 82124</p>
+    <p class="legal">
+      <span>&copy; <span id="anio">2026</span> CLARILIUM</span>
+      <span>SAP, ABAP, Fiori, SAPUI5 and SAP BTP are registered trademarks of SAP SE</span>
+    </p>
+  </div>
+</footer>
+
+<script src="../../assets/js/main.js" defer></script>
+</body>
+</html>

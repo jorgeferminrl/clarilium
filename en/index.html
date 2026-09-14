@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en" data-idioma="en" data-otro="../index.html">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLARILIUM — ABAP, Fiori and SAP Cloud Software Factory</title>
+<meta name="description" content="ABAP, Fiori and SAP Cloud software factory. Experience in technology solutions since 2007. Clear ideas, clear solutions.">
+<link rel="canonical" href="https://clarilium.com/en/">
+<link rel="alternate" hreflang="es-mx" href="https://clarilium.com/">
+<link rel="alternate" hreflang="en" href="https://clarilium.com/en/">
+<link rel="alternate" hreflang="x-default" href="https://clarilium.com/">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="CLARILIUM">
+<meta property="og:title" content="CLARILIUM — ABAP, Fiori and SAP Cloud Software Factory">
+<meta property="og:description" content="Clear ideas, clear solutions.">
+<meta property="og:url" content="https://clarilium.com/en/">
+<meta property="og:image" content="https://clarilium.com/assets/img/og-en.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="../assets/img/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">
+<meta name="theme-color" content="#0c193e">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700;0,900;1,700&family=Roboto:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/css/styles.css">
+
+<!-- Theme and language: applied before paint, so there is no flash -->
+<script>
+(function () {
+  var raiz = document.documentElement;
+  try {
+    var tema = localStorage.getItem('clarilium-tema');
+    if (tema) raiz.setAttribute('data-tema', tema);
+  } catch (e) {}
+  try {
+    var otro = raiz.getAttribute('data-otro');
+    if (otro) {
+      var esEspanol = raiz.getAttribute('data-idioma') === 'es';
+      var elegido = localStorage.getItem('clarilium-idioma');
+      var param = new URLSearchParams(location.search).get('lang');
+      if (param) { elegido = param; localStorage.setItem('clarilium-idioma', param); }
+      if (!elegido) {
+        var idiomas = navigator.languages || [navigator.language || ''];
+        var hablaEspanol = idiomas.some(function (l) { return /^es/i.test(l); });
+        if (hablaEspanol !== esEspanol) location.replace(otro);
+      } else if (elegido !== (esEspanol ? 'es' : 'en')) {
+        location.replace(otro);
+      }
+    }
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+
+<a class="saltar" href="#contenido">Skip to main content</a>
+
+<div class="barra-superior">
+  <div class="cintillo">
+    <div class="contenedor cintillo__inner">
+      <span>We have the best rates and service on the market!</span>
+      <a class="boton-cintillo" href="../en/contact.html">More information</a>
+    </div>
+  </div>
+
+  <header class="sitio-header">
+    <div class="contenedor sitio-header__inner">
+      <button class="boton-icono nav-toggle" type="button" aria-expanded="false" aria-controls="nav-principal" aria-label="Open menu"><i></i></button>
+
+      <a class="marca" href="../en/index.html" aria-label="CLARILIUM — home">
+        <img src="../assets/img/logo-nav-color.png" alt="CLARILIUM" width="900" height="191">
+      </a>
+
+      <nav class="nav" id="nav-principal" aria-label="Main navigation">
+        <button class="nav-cerrar" type="button" aria-label="Close menu">&times;</button>
+
+        <a href="../en/index.html" aria-current="page">Home</a>
+
+        <div class="submenu">
+          <a class="submenu__disparador" href="../en/services.html">Services</a>
+          <button class="submenu__flecha" type="button" aria-expanded="false" aria-controls="submenu-servicios" aria-label="Show services">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <ul class="submenu__lista" id="submenu-servicios">
+            <li><a href="../en/services/abap.html">ABAP</a></li>
+            <li><a href="../en/services/fiori.html">Fiori</a></li>
+            <li><a href="../en/services/sapui5.html">SAPUI5</a></li>
+            <li><a href="../en/services/cloud.html">Cloud</a></li>
+            <li><a href="../en/services/btp.html">SAP BTP</a></li>
+            <li><a href="../en/services/integration-suite.html">SAP CPI</a></li>
+          </ul>
+        </div>
+
+        <a href="../en/about.html">About</a>
+        <a href="../en/contact.html">Contact</a>
+      </nav>
+
+      <div class="acciones">
+        <a class="boton-icono" id="btn-idioma" href="../index.html?lang=es" hreflang="es-mx" lang="es-mx"
+           title="Cambiar a español" aria-label="Switch to Spanish">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.5 9h17M3.5 15h17"/><path d="M12 3c2.3 2.4 3.4 5.4 3.4 9s-1.1 6.6-3.4 9c-2.3-2.4-3.4-5.4-3.4-9S9.7 5.4 12 3Z"/></svg>
+          ES
+        </a>
+
+        <button class="boton-icono" id="btn-tema" type="button" aria-label="Switch between light and dark mode" title="Light / dark mode">
+          <svg class="icono-sol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="icono-luna" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+</div>
+
+<div class="velo" id="velo" hidden></div>
+
+<main id="content">
+
+  <div class="banda-oscura">
+    <h1 class="franja">ABAP, Fiori and SAP Cloud Software Factory</h1>
+  </div>
+
+  <section class="banda-oscura hero" id="home">
+    <img src="../assets/img/logo-hero-en.png" alt="CLARILIUM — Clear ideas, clear solutions" width="1400" height="305" fetchpriority="high">
+  </section>
+
+  <section class="seccion centro">
+    <div class="contenedor">
+      <p class="titular">Talk to us today about tomorrow's technology</p>
+      <a class="boton" href="contact.html">Contact</a>
+    </div>
+  </section>
+
+  <div class="banda-oscura">
+    <div class="contenedor">
+      <p class="cita">Our clients' satisfaction is what drives us every day…</p>
+    </div>
+  </div>
+
+  <section class="seccion">
+    <div class="contenedor metodologia">
+      <div class="metodologia__figura">
+        <img src="../assets/img/hero.webp" alt="" width="600" height="600">
+      </div>
+      <div>
+        <p class="formula">Satisfaction&nbsp;= <span class="etapas">Explore + Prepare + Build + Release</span></p>
+
+        <div class="etapa">
+          <h3>Explore</h3>
+          <p>Careful exploration of the client's processes</p>
+        </div>
+        <div class="etapa">
+          <h3>Prepare</h3>
+          <p>Proper planning for every stage of the project</p>
+        </div>
+        <div class="etapa">
+          <h3>Build</h3>
+          <p>Hands on the work, by professionals in their field, for a solution that fits</p>
+        </div>
+        <div class="etapa">
+          <h3>Release</h3>
+          <p>Quality review processes</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="banda-oscura seccion">
+    <div class="contenedor pilares">
+      <div class="pilar">
+        <img src="../assets/img/pilar-mision.webp" alt="" width="480" height="480" loading="lazy">
+        <h3>Mission</h3>
+        <p>To be the pillar of our clients' success, taking on every project as our own commitment</p>
+      </div>
+      <div class="pilar">
+        <img src="../assets/img/pilar-vision.webp" alt="" width="480" height="480" loading="lazy">
+        <h3>Vision</h3>
+        <p>Together, building our clients' success with our ideas and experience</p>
+      </div>
+      <div class="pilar">
+        <img src="../assets/img/pilar-proposito.webp" alt="" width="480" height="480" loading="lazy">
+        <h3>Purpose</h3>
+        <p>Passionate about serving, we drive your growth</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <div class="contenedor cifra">
+      <div class="cifra__numero"><span class="signo">+</span><span data-anios>18</span></div>
+      <p class="cifra__texto">Years of experience in technology solutions for different companies and different operating areas</p>
+    </div>
+  </section>
+
+  <!-- Separador de marca entre la cifra y las tecnologías -->
+  <div class="banda-oscura separador"></div>
+
+  <section class="seccion seccion--ajustada">
+    <div class="contenedor">
+      <h2 class="centro">Technologies</h2>
+    </div>
+  </section>
+
+  <div class="banda-oscura fichas-banda">
+    <div class="contenedor">
+      <div class="tecnologias">
+        <a class="ficha" href="services/btp.html">
+          <img src="../assets/img/tec-btp.webp" alt="SAP BTP" width="420" height="420" loading="lazy">
+        </a>
+        <a class="ficha" href="services/cloud.html">
+          <img src="../assets/img/tec-cloud.webp" alt="SAP Cloud" width="420" height="420" loading="lazy">
+        </a>
+        <a class="ficha" href="services/integration-suite.html">
+          <img src="../assets/img/tec-integration-suite.webp" alt="SAP Integration Suite / CPI" width="420" height="420" loading="lazy">
+        </a>
+        <a class="ficha" href="services/fiori.html">
+          <img src="../assets/img/tec-fiori.webp" alt="SAP Fiori" width="420" height="420" loading="lazy">
+        </a>
+        <a class="ficha" href="services/sapui5.html">
+          <img src="../assets/img/tec-ui5.webp" alt="SAPUI5" width="420" height="420" loading="lazy">
+        </a>
+        <a class="ficha" href="services/abap.html">
+          <img src="../assets/img/tec-abap.webp" alt="SAP ABAP" width="420" height="420" loading="lazy">
+        </a>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer class="sitio-footer">
+  <div class="contenedor">
+    <a href="../en/index.html"><img src="../assets/img/logo-hero-en.png" alt="CLARILIUM" width="1400" height="305" loading="lazy"></a>
+    <p class="direccion">Avenida de las Torres Coto 16, Real del Valle,<br>Mazatlán, Sinaloa, Mexico, postal code 82124</p>
+    <p class="legal">
+      <span>&copy; <span id="anio">2026</span> CLARILIUM</span>
+      <span>SAP, ABAP, Fiori, SAPUI5 and SAP BTP are registered trademarks of SAP SE</span>
+    </p>
+  </div>
+</footer>
+
+<script src="../assets/js/main.js" defer></script>
+</body>
+</html>
