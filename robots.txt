@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /timesheet
 
 Sitemap: https://www.clarilium.com/sitemap.xml

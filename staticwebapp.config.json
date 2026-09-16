@@ -96,6 +96,16 @@
       ]
     },
     {
+      "route": "/timesheet",
+      "redirect": "https://clarilium.sharepoint.com/sites/timesheet",
+      "statusCode": 302
+    },
+    {
+      "route": "/timesheet/*",
+      "redirect": "https://clarilium.sharepoint.com/sites/timesheet",
+      "statusCode": 302
+    },
+    {
       "route": "/herramientas/*",
       "statusCode": 404
     },
