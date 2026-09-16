@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://clarilium.com/sitemap.xml
+Sitemap: https://www.clarilium.com/sitemap.xml

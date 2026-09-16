@@ -349,10 +349,15 @@ TEXTOS = {
 ANCLA = {'es': {'inicio': 'inicio', 'nosotros': 'nosotros', 'contacto': 'contacto'},
          'en': {'inicio': 'home',   'nosotros': 'about',    'contacto': 'contact'}}
 
-URL_SERVICIO = {'es': 'https://clarilium.com/servicios/{}',
-                'en': 'https://clarilium.com/en/services/{}'}
-URL_INDICE = {'es': 'https://clarilium.com/servicios',
-              'en': 'https://clarilium.com/en/services'}
+# Dirección oficial del sitio. Se usa en las etiquetas canónicas, hreflang,
+# Open Graph y datos estructurados. Si algún día cambia el dominio, se cambia
+# aquí y se vuelve a correr este script: es el único lugar donde está escrito.
+SITIO = 'https://www.clarilium.com'
+
+URL_SERVICIO = {'es': SITIO + '/servicios/{}',
+                'en': SITIO + '/en/services/{}'}
+URL_INDICE = {'es': SITIO + '/servicios',
+              'en': SITIO + '/en/services'}
 
 # Dónde vive cada página del menú. Todos los enlaces del sitio salen de aquí,
 # así que para mover o renombrar una página basta con cambiarla en este mapa.
@@ -363,8 +368,8 @@ ARCHIVO = {
            'nosotros': 'en/about.html', 'contacto': 'en/contact.html'},
 }
 URL_PAGINA = {
-    'es': {'nosotros': 'https://clarilium.com/nosotros', 'contacto': 'https://clarilium.com/contacto'},
-    'en': {'nosotros': 'https://clarilium.com/en/about', 'contacto': 'https://clarilium.com/en/contact'},
+    'es': {'nosotros': SITIO + '/nosotros', 'contacto': SITIO + '/contacto'},
+    'en': {'nosotros': SITIO + '/en/about', 'contacto': SITIO + '/en/contact'},
 }
 
 
@@ -516,7 +521,7 @@ def encabezado_html(idioma, p, titulo, meta, canonical, alt_es, alt_en, og, otro
 <meta property="og:title" content="{titulo}">
 <meta property="og:description" content="{meta}">
 <meta property="og:url" content="{canonical}">
-<meta property="og:image" content="https://clarilium.com/assets/img/{og}">
+<meta property="og:image" content="{SITIO}/assets/img/{og}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="{t['ogLocale']}">
@@ -606,7 +611,7 @@ def pagina_servicio(idioma, slug):
   "serviceType": "{c['nombre']}",
   "description": "{c['meta']}",
   "url": "{URL_SERVICIO[idioma].format(slug)}",
-  "provider": {{ "@type": "ProfessionalService", "name": "CLARILIUM", "url": "https://clarilium.com/" }},
+  "provider": {{ "@type": "ProfessionalService", "name": "CLARILIUM", "url": "{SITIO}/" }},
   "areaServed": "MX"
 }}
 </script>'''
