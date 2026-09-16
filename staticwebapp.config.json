@@ -97,13 +97,11 @@
     },
     {
       "route": "/timesheet",
-      "redirect": "https://clarilium.sharepoint.com/sites/timesheet",
-      "statusCode": 302
+      "rewrite": "/timesheet.html"
     },
     {
       "route": "/timesheet/*",
-      "redirect": "https://clarilium.sharepoint.com/sites/timesheet",
-      "statusCode": 302
+      "rewrite": "/timesheet.html"
     },
     {
       "route": "/herramientas/*",
