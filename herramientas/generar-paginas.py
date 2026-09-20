@@ -354,10 +354,14 @@ ANCLA = {'es': {'inicio': 'inicio', 'nosotros': 'nosotros', 'contacto': 'contact
 # aquí y se vuelve a correr este script: es el único lugar donde está escrito.
 SITIO = 'https://www.clarilium.com'
 
-# Sitio de SharePoint donde se registran las horas. La pagina /timesheet del
+# Lista de SharePoint donde se registran las horas. La pagina /timesheet del
 # sitio publico no es mas que un salto hacia aqui: quien llegue tiene que
 # iniciar sesion con una cuenta del tenant de CLARILIUM.
-TIMESHEET = 'https://clarilium.sharepoint.com/sites/timesheet'
+# Apunta a la lista y no al sitio (.../sites/timesheet/) a proposito: la
+# pagina de inicio del sitio depende de estar publicada, y mientras tenga un
+# borrador sin publicar los demas usuarios ven una version vieja y el
+# formulario guarda en el vacio sin marcar error.
+TIMESHEET = 'https://clarilium.sharepoint.com/sites/timesheet/Lists/Timesheet/AllItems.aspx'
 
 URL_SERVICIO = {'es': SITIO + '/servicios/{}',
                 'en': SITIO + '/en/services/{}'}
