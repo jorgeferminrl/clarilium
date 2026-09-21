@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#040814">
   <meta name="description" content="Dashboard empresarial para análisis, aprobación y facturación de horas CLARILIUM.">
   <title>Reportes · CLARILIUM</title>
+  <meta name="reportes-version" content="2026.09.20-4">
   <meta name="robots" content="noindex">
   <link rel="icon" href="assets/img/favicon-32.png" sizes="32x32">
   <meta name="theme-color" content="#040814">
@@ -39,6 +40,7 @@
         <p id="authMsg" hidden>Inicia sesión con tu cuenta de CLARILIUM para consultar la información del TimeSheet.</p>
         <button id="signIn" class="auth-gate__btn" type="button" hidden>Iniciar sesión con Microsoft</button>
         <div id="authError" class="auth-gate__error"></div>
+        <button id="retry" class="auth-gate__btn" type="button" hidden>Reintentar</button>
       </div>
     </div>
   </div>
@@ -56,6 +58,11 @@
     </aside>
 
     <main id="main" class="main" tabindex="-1">
+      <section id="diagPanel" class="diag" hidden>
+        <h2>Diagnóstico de lectura de SharePoint</h2>
+        <p>Esta vista solo aparece al abrir la página con <code>?diagnostico=1</code>.</p>
+        <pre id="diagOut"></pre>
+      </section>
       <section class="filter-panel" aria-labelledby="filterTitle">
         <div class="section-heading compact">
           <div><p class="eyebrow">CONTROL GLOBAL</p><h2 id="filterTitle">Filtros de análisis</h2></div>

@@ -408,9 +408,32 @@ function hideGate() { document.getElementById("authGate").classList.add("auth-ga
 // Mientras se resuelve la sesion se muestra el circulo de progreso y se
 // esconde el boton: ofrecer "iniciar sesion" antes de tiempo solo confunde.
 function setGateChecking(activo) {
-  document.getElementById("authSpinner").hidden = !activo;
-  document.getElementById("authMsg").hidden = activo;
-  document.getElementById("signIn").hidden = activo;
+  const [girando, texto, entrar] = ["authSpinner", "authMsg", "signIn"].map(id => document.getElementById(id));
+  if (girando) girando.hidden = !activo;
+  if (texto) texto.hidden = activo;
+  if (entrar) entrar.hidden = activo;
+}
+
+// Version de los tres archivos. Se inyecta al publicar en el HTML, el CSS y
+// el JS a la vez; si no coinciden, la pagina lo dice en vez de fallar callada.
+const VERSION_REPORTES = "2026.09.20-4";
+
+function versionesPublicadas() {
+  const html = document.querySelector('meta[name="reportes-version"]')?.content || "sin versión";
+  const css = getComputedStyle(document.documentElement)
+    .getPropertyValue("--reportes-version").trim().replace(/["']/g, "") || "sin versión";
+  return { html, css, js: VERSION_REPORTES };
+}
+
+// Muestra un fallo en el porton. Nada aqui puede lanzar otro error: es la
+// ultima red de seguridad, asi que todo acceso al documento es tolerante.
+function mostrarFalla(mensaje) {
+  document.getElementById("authGate")?.classList.remove("auth-gate--oculto");
+  ["authSpinner", "authMsg", "signIn"].forEach(id => { const el = document.getElementById(id); if (el) el.hidden = true; });
+  const reintentar = document.getElementById("retry");
+  if (reintentar) reintentar.hidden = false;
+  const error = document.getElementById("authError");
+  if (error) { error.textContent = mensaje; error.classList.add("show"); }
 }
 
 function renderAccountChip() {
@@ -998,6 +1021,7 @@ function enDiagnostico() {
 
 function renderDiagnostico() {
   const panel = document.getElementById("diagPanel");
+  if (!panel) return;
   if (!enDiagnostico()) { panel.hidden = true; return; }
   panel.hidden = false;
   const invalidos = state.invalidRows.map(r => ({
@@ -1128,6 +1152,29 @@ function rateEditorRemove(e) {
   const btn=e.target.closest(".remove-row");if(!btn)return;const row=btn.closest("[data-rate-id]");const key=row.dataset.rateType==="client"?"clientRates":"collabRates";state[key]=state[key].filter(r=>r.id!==row.dataset.rateId);saveStorage();renderRateEditors();updateAll();
 }
 async function init() {
+  document.getElementById("retry")?.addEventListener("click", () => window.location.reload());
+  // Vigilante: pase lo que pase, el circulo no puede girar para siempre.
+  const vigilante = setTimeout(() => {
+    const girando = document.getElementById("authSpinner");
+    if (girando && !girando.hidden) {
+      mostrarFalla("La conexión con Microsoft está tardando más de lo normal. Revisa tu conexión y vuelve a intentar.");
+    }
+  }, 25000);
+  try {
+    await iniciar();
+  } catch (error) {
+    console.error("Reportes: fallo al iniciar", error);
+    mostrarFalla(`No se pudo iniciar la página. ${error.message}`);
+  } finally {
+    clearTimeout(vigilante);
+  }
+}
+
+async function iniciar() {
+  const v = versionesPublicadas();
+  if (v.html !== VERSION_REPORTES || v.css !== VERSION_REPORTES) {
+    throw new Error(`Los archivos publicados no coinciden entre sí (página ${v.html}, estilos ${v.css}, código ${v.js}). Hay que volver a publicar reportes.html, reportes.css y reportes.js juntos.`);
+  }
   document.body.classList.toggle("dark",saved.theme==="dark");
   bindEvents();
   populateControls();
@@ -1135,6 +1182,7 @@ async function init() {
 
   // Abierta desde el disco: no hay inicio de sesión posible, se muestra el modo demo.
   if (isDemo()) {
+    setGateChecking(false);
     hideGate();
     document.getElementById("demoBanner").classList.add("show");
     document.getElementById("refreshNow").hidden = true;
