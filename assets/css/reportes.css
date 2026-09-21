@@ -1,4 +1,4 @@
-:root{--reportes-version:"2026.09.20-5";}
+:root{--reportes-version:"2026.09.20-6";}
 :root {
   --clarilium-night: #040814;
   --clarilium-navy: #0D1728;
@@ -315,3 +315,11 @@ body.dark .diag{background:#10182f;color:#eef2ff;}
 body.dark .diag pre{background:#040814;color:#cfe0ff;}
 
 .auth-gate__error + .auth-gate__btn{margin-top:16px;}
+
+/* ---- Captura de horas y estado en vivo ---- */
+.nav-item--externo{margin-top:14px;border-top:1px solid rgba(255,255,255,.12);padding-top:16px;color:#cd9cff;}
+.nav-item--externo:hover{color:#ffffff;}
+.live-status{display:inline-flex;align-items:center;gap:7px;font-size:.74rem;opacity:.85;white-space:nowrap;margin-right:6px;}
+.live-status::before{content:"";width:8px;height:8px;border-radius:50%;background:#2ecc71;}
+.live-status--error::before{background:#e5484d;}
+@media (max-width:900px){ .live-status{display:none !important;} }

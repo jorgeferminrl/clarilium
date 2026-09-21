@@ -17,7 +17,9 @@ const APP = {
     adminGroupId: "6ee2df68-1c63-4303-b1ee-8367adbf035f",
     hostname: "clarilium.sharepoint.com",
     sitePath: "/sites/timesheet",
-    lists: { timesheet: "Timesheet", clients: "Clientes", consultants: "Consultores" }
+    lists: { timesheet: "Timesheet", clients: "Clientes", consultants: "Consultores" },
+    // Vista de la lista que se abre en la ventana emergente de captura.
+    listUrl: "https://clarilium.sharepoint.com/sites/timesheet/Lists/Timesheet/AllItems.aspx"
   },
   // Nombres visibles de las columnas de la lista Timesheet.
   // Los nombres internos se resuelven solos al arrancar, asi que los acentos y
@@ -41,7 +43,12 @@ const APP = {
     "Marca temporal", "Cliente", "Fecha", "Horas", "Requerimiento",
     "Tipo de actividad", "Desarrollador", "Nota", "Comentarios adicionales (uso interno)"
   ],
-  refreshMs: 300000,
+  // Cada cuanto se pregunta a SharePoint si alguna lista cambio. Es una sola
+  // consulta minima; los datos solo se recargan si de verdad hubo cambios.
+  pollMs: 15000,
+  // Recarga completa de respaldo, por si un cambio no movio la marca de fecha
+  // de la lista (por ejemplo, algunos borrados).
+  refreshMs: 120000,
   minRefreshMs: 60000,
   storageKey: "clarilium-timesheet-config-v1",
   colors: ["#9440FF", "#2590E7", "#B564FF", "#61B5F0", "#6B21A8", "#1667A8"],
@@ -129,7 +136,8 @@ class GraphDataProvider extends DataProvider {
   }
 
   async lists(siteId) {
-    const all = await this.all(`${APP.graph.base}/sites/${siteId}/lists?$select=id,name,displayName&$top=200`);
+    const all = await this.all(`${APP.graph.base}/sites/${siteId}/lists?$select=id,name,displayName,lastModifiedDateTime&$top=200`);
+    this.todas = all;
     const byName = new Map();
     all.forEach(list => {
       byName.set(norm(list.displayName), list);
@@ -201,6 +209,10 @@ class GraphDataProvider extends DataProvider {
     applyRoleVisibility();
     const siteId = await this.siteId();
     const byName = await this.lists(siteId);
+    // Se recuerdan el sitio, las tres listas y su marca de ultima modificacion:
+    // con eso, detectar cambios cuesta una sola consulta pequena.
+    const ids = Object.values(APP.graph.lists).map(nombre => byName.get(norm(nombre))?.id).filter(Boolean);
+    state.sp = { siteId, ids, marca: firmaListas(this.todas, ids) };
 
     // Los catalogos van primero: sus mapas id -> texto son los que resuelven
     // las columnas de busqueda de la lista Timesheet.
@@ -427,7 +439,7 @@ function setGateChecking(activo) {
 
 // Version de los tres archivos. Se inyecta al publicar en el HTML, el CSS y
 // el JS a la vez; si no coinciden, la pagina lo dice en vez de fallar callada.
-const VERSION_REPORTES = "2026.09.20-5";
+const VERSION_REPORTES = "2026.09.20-6";
 
 function versionesPublicadas() {
   const html = document.querySelector('meta[name="reportes-version"]')?.content || "sin versión";
@@ -1060,12 +1072,14 @@ async function updateFromProvider(provider,{silent=false,successLabel="Fuente ac
     try{
       const payload=await provider.load();
       state.syncStatus="ok";
+      marcarEnVivo();
       state.syncError="";
       loadPayload(payload,{preserveUi:Boolean(state.dataSignature)});
       if(!silent)toast(`${successLabel}: ${state.records.length} registros válidos.`);
       return true;
     }catch(error){
       state.syncStatus="error";
+      marcarEnVivo(error.message);
       state.syncError=error.message;
       if(!silent||!state.records.length)toast(error.message);
       return false;
@@ -1108,7 +1122,75 @@ function setView(view) {
 }
 
 function refreshSectionData() {
-  return refreshRemoteData({silent:true});
+  return revisarCambios();
+}
+
+/* ------------------------------------------------------------------ *
+ * Actualizacion casi en tiempo real
+ * ------------------------------------------------------------------ */
+function firmaListas(listas, ids) {
+  return ids.map(id => `${id}:${(listas || []).find(l => l.id === id)?.lastModifiedDateTime || ""}`).join("|");
+}
+
+// Pregunta a SharePoint, con una sola consulta, si alguna de las tres listas
+// cambio desde la ultima carga. Solo si cambio, se recargan los datos.
+async function revisarCambios() {
+  if (isDemo() || !auth.account || !state.sp?.siteId || state.refreshPromise) return false;
+  try {
+    const token = await auth.token();
+    const respuesta = await fetch(
+      `${APP.graph.base}/sites/${state.sp.siteId}/lists?$select=id,lastModifiedDateTime&$top=200`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
+    if (!respuesta.ok) return false;
+    const datos = await respuesta.json();
+    if (firmaListas(datos.value, state.sp.ids) === state.sp.marca) {
+      marcarEnVivo();
+      return false;
+    }
+    return refreshRemoteData({ silent: true, force: true });
+  } catch {
+    return false;   // se reintenta en la siguiente vuelta
+  }
+}
+
+// Indicador junto al boton de actualizar: deja ver que la pagina esta viva.
+function marcarEnVivo(error) {
+  const el = document.getElementById("liveStatus");
+  if (!el || isDemo()) return;
+  el.hidden = false;
+  el.classList.toggle("live-status--error", Boolean(error));
+  const hora = new Intl.DateTimeFormat("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date());
+  el.textContent = error ? "Sin conexión" : `En vivo · ${hora}`;
+  el.title = error ? error : "La página revisa cambios en SharePoint cada 15 segundos";
+}
+
+/* ------------------------------------------------------------------ *
+ * Ventana emergente de captura (la lista de SharePoint)
+ * ------------------------------------------------------------------ */
+let ventanaTimesheet = null;
+
+function abrirTimesheet() {
+  if (ventanaTimesheet && !ventanaTimesheet.closed) { ventanaTimesheet.focus(); return; }
+  // Se acomoda en la mitad derecha de la pantalla, para ver los reportes a la izquierda.
+  const ancho = Math.round(Math.min(Math.max(window.screen.availWidth * 0.45, 520), 960));
+  const alto = window.screen.availHeight;
+  const izquierda = (window.screen.availLeft || 0) + window.screen.availWidth - ancho;
+  const arriba = window.screen.availTop || 0;
+  ventanaTimesheet = window.open(APP.graph.listUrl, "clariliumTimesheet",
+    `popup=yes,width=${ancho},height=${alto},left=${izquierda},top=${arriba}`);
+  if (!ventanaTimesheet) {
+    toast("El navegador bloqueó la ventana emergente. Permite ventanas emergentes para www.clarilium.com.");
+    return;
+  }
+  // Al cerrarse la ventana, se revisa de inmediato si hubo cambios.
+  clearInterval(abrirTimesheet.vigia);
+  abrirTimesheet.vigia = setInterval(() => {
+    if (!ventanaTimesheet || ventanaTimesheet.closed) {
+      clearInterval(abrirTimesheet.vigia);
+      ventanaTimesheet = null;
+      revisarCambios();
+    }
+  }, 1000);
 }
 
 function navigateToView(view) {
@@ -1147,8 +1229,10 @@ function bindEvents() {
   document.getElementById("manualAssignmentsBody").addEventListener("change",e=>{if(!e.target.classList.contains("manual-select"))return;state.manualAssignments[e.target.closest("tr").dataset.recordId]=e.target.value;saveStorage();updateAll();});
   document.querySelectorAll("[data-billing-export]").forEach(btn=>btn.addEventListener("click",()=>exportRows(billingExportRows(btn.dataset.billingExport),btn.dataset.format,btn.dataset.billingExport==="client"?"Facturación a clientes":"Pago a colaboradores",btn.dataset.billingExport==="client"?"facturacion-clientes":"pago-colaboradores")));
   document.getElementById("themeToggle").addEventListener("click",()=>{document.body.classList.toggle("dark");saveStorage();updateAll();});
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshRemoteData({silent:true});});
-  window.addEventListener("focus",()=>refreshRemoteData({silent:true}));
+  // Al volver a la pagina (por ejemplo, desde la ventana de captura) se revisa al instante.
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)revisarCambios();});
+  window.addEventListener("focus",()=>revisarCambios());
+  document.getElementById("openTimesheet").addEventListener("click", abrirTimesheet);
   document.getElementById("refreshNow").addEventListener("click",()=>refreshRemoteData({force:true}));
   document.getElementById("signIn").addEventListener("click",()=>auth.signIn());
   document.getElementById("signOut").addEventListener("click",()=>auth.signOut());
@@ -1221,7 +1305,8 @@ async function iniciar() {
   state.isAdmin = auth.isAdmin();
   applyRoleVisibility();
   await refreshRemoteData({ force: true });
-  window.setInterval(()=>refreshRemoteData({silent:true}),APP.refreshMs);
+  window.setInterval(()=>revisarCambios(), APP.pollMs);
+  window.setInterval(()=>refreshRemoteData({silent:true}), APP.refreshMs);
 }
 
 init();

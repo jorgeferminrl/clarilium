@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#040814">
   <meta name="description" content="Dashboard empresarial para análisis, aprobación y facturación de horas CLARILIUM.">
   <title>Reportes · CLARILIUM</title>
-  <meta name="reportes-version" content="2026.09.20-5">
+  <meta name="reportes-version" content="2026.09.20-6">
   <meta name="robots" content="noindex">
   <link rel="icon" href="assets/img/favicon-32.png" sizes="32x32">
   <meta name="theme-color" content="#040814">
@@ -23,6 +23,7 @@
       </button>
       <div class="topbar__title">TIMESHEET</div>
       <div class="topbar__actions">
+        <span id="liveStatus" class="live-status" hidden></span>
         <button id="refreshNow" class="icon-button" type="button" aria-label="Actualizar datos desde SharePoint" title="Actualizar desde SharePoint">⟳</button>
         <span id="accountChip" class="account-chip" hidden><span id="accountName" class="account-chip__name"></span><span id="accountRole" class="account-chip__role"></span><button id="signOut" class="account-chip__out" type="button">Salir</button></span>
         <button id="themeToggle" class="icon-button" type="button" aria-label="Cambiar tema">◐</button>
@@ -54,6 +55,7 @@
         <button class="nav-item" data-view="approval">Reporte mensual de horas</button>
         <button class="nav-item" data-view="clientBilling">Facturación a clientes</button>
         <button class="nav-item" data-view="collabBilling">Pago a colaboradores</button>
+        <button id="openTimesheet" class="nav-item nav-item--externo" type="button" title="Abre la lista de SharePoint en una ventana aparte">Capturar horas <span aria-hidden="true">↗</span></button>
       </nav>
     </aside>
 
