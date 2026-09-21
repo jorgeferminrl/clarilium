@@ -6,7 +6,12 @@ const APP = {
     base: "https://graph.microsoft.com/v1.0",
     clientId: "e122c4bd-0f08-48c1-a274-f55925229261",
     tenantId: "4ded6d76-6c1b-43eb-813b-423ecf957f15",
-    scopes: ["User.Read", "Sites.Read.All"],
+    // Sites.Manage.All y no Sites.Read.All: con un permiso de solo lectura la
+    // aplicacion le recorta al propietario el derecho de saltarse el candado
+    // "leer solo lo creado por el usuario", y el administrador veria solo lo
+    // suyo. A los consultores no les amplia nada: su acceso real sigue siendo
+    // el de su cuenta, y el candado de SharePoint los sigue limitando.
+    scopes: ["User.Read", "Sites.Manage.All"],
     // Grupo de seguridad de Entra ID cuyos miembros son administradores.
     // Quien no pertenezca a el ve solo sus propias horas y no ve facturacion.
     adminGroupId: "6ee2df68-1c63-4303-b1ee-8367adbf035f",
@@ -349,9 +354,15 @@ const auth = {
         clientId: APP.graph.clientId,
         authority: `https://login.microsoftonline.com/${APP.graph.tenantId}`,
         redirectUri: window.location.origin + window.location.pathname,
-        navigateToLoginRequestUrl: false
+        // Tras iniciar sesion, regresar a la direccion exacta de la que se
+        // salio, con sus parametros (por ejemplo ?diagnostico=1).
+        navigateToLoginRequestUrl: true
       },
-      cache: { cacheLocation: "sessionStorage" }
+      // localStorage: la sesion sobrevive a recargas y pestanas nuevas, asi
+      // que no hay que volver a entrar ni esperar la verificacion silenciosa.
+      // Es aceptable porque la politica de seguridad de /reportes solo admite
+      // scripts del propio sitio.
+      cache: { cacheLocation: "localStorage" }
     });
     await this.client.initialize();
 
@@ -366,7 +377,7 @@ const auth = {
         promesa,
         new Promise((_, rechazar) => setTimeout(() => rechazar(new Error("tiempo agotado")), ms))
       ]);
-      try { cuenta = (await conLimite(this.client.ssoSilent({ scopes: APP.graph.scopes }), 8000)).account; }
+      try { cuenta = (await conLimite(this.client.ssoSilent({ scopes: APP.graph.scopes }), 5000)).account; }
       catch { cuenta = null; }
     }
     if (cuenta) this.client.setActiveAccount(cuenta);
@@ -416,7 +427,7 @@ function setGateChecking(activo) {
 
 // Version de los tres archivos. Se inyecta al publicar en el HTML, el CSS y
 // el JS a la vez; si no coinciden, la pagina lo dice en vez de fallar callada.
-const VERSION_REPORTES = "2026.09.20-4";
+const VERSION_REPORTES = "2026.09.20-5";
 
 function versionesPublicadas() {
   const html = document.querySelector('meta[name="reportes-version"]')?.content || "sin versión";
