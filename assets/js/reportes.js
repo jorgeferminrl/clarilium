@@ -160,25 +160,33 @@ class GraphDataProvider extends DataProvider {
   }
 
   // Lee un catalogo probando los nombres de columna configurados, en orden.
+  // Devuelve los valores y, sobre todo, el mapa id -> texto: es lo que permite
+  // resolver las columnas de busqueda de la lista Timesheet, porque Graph
+  // entrega la referencia (…LookupId) y no siempre el texto.
   async catalog(siteId, byName, listKey, warnings) {
     const wanted = APP.graph.lists[listKey];
+    const vacio = { valores: [], porId: new Map() };
     const list = byName.get(norm(wanted));
-    if (!list) { warnings.push(`Falta la lista de catálogo “${wanted}”.`); return []; }
+    if (!list) { warnings.push(`Falta la lista de catálogo “${wanted}”.`); return vacio; }
     const map = await this.columnMap(siteId, list.id);
     const items = await this.itemFields(siteId, list.id);
     for (const candidate of APP.catalogColumns[listKey]) {
       const internal = map.get(norm(candidate));
       if (!internal) continue;
-      const values = unique(items.map(item => lookupText(item.fields?.[internal])).filter(Boolean));
-      if (values.length) {
+      const porId = new Map();
+      items.forEach(item => {
+        const texto = lookupText(item.fields?.[internal]);
+        if (texto) porId.set(String(item.id), texto);
+      });
+      if (porId.size) {
         if (norm(candidate) !== norm(APP.catalogColumns[listKey][0])) {
           warnings.push(`En “${wanted}” se usó la columna “${candidate}” para los nombres.`);
         }
-        return values.sort((a, b) => a.localeCompare(b, "es"));
+        return { valores: unique([...porId.values()]).sort((a, b) => a.localeCompare(b, "es")), porId };
       }
     }
     warnings.push(`No se encontró una columna de nombre utilizable en “${wanted}”.`);
-    return [];
+    return vacio;
   }
 
   async load() {
@@ -188,6 +196,11 @@ class GraphDataProvider extends DataProvider {
     applyRoleVisibility();
     const siteId = await this.siteId();
     const byName = await this.lists(siteId);
+
+    // Los catalogos van primero: sus mapas id -> texto son los que resuelven
+    // las columnas de busqueda de la lista Timesheet.
+    const catClientes = await this.catalog(siteId, byName, "clients", warnings);
+    const catConsultores = await this.catalog(siteId, byName, "consultants", warnings);
 
     const timesheet = this.requireList(byName, APP.graph.lists.timesheet);
     const map = await this.columnMap(siteId, timesheet.id);
@@ -200,26 +213,42 @@ class GraphDataProvider extends DataProvider {
     }
 
     const items = await this.itemFields(siteId, timesheet.id);
-    const campo = (fields, clave) => fields[map.get(norm(APP.columns[clave]))];
+    const interno = clave => map.get(norm(APP.columns[clave]));
+
+    // Una columna de busqueda o de persona puede llegar de tres formas:
+    // como texto, como objeto con LookupValue, o solo como "<columna>LookupId".
+    // Esta funcion cubre las tres.
+    const valor = (fields, clave, catalogo) => {
+      const nombre = interno(clave);
+      const directo = lookupText(fields[nombre]);
+      if (directo) return directo;
+      const id = fields[`${nombre}LookupId`];
+      if (id == null) return "";
+      if (catalogo) return catalogo.porId.get(String(id)) || "";
+      return "";
+    };
 
     const rows = items.map(item => {
       const fields = item.fields || {};
-      const horasDe = lookupText(campo(fields, "horasDe"));
-      const asignadoA = lookupText(campo(fields, "asignadoA"));
+      const autor = item.createdBy?.user || {};
+      // "Horas de" siempre coincide con quien capturo, asi que si la columna no
+      // trae texto, el autor del elemento es una fuente fiable y exacta.
+      const horasDe = valor(fields, "horasDe") || clean(autor.displayName);
+      const asignadoA = valor(fields, "asignadoA", catConsultores);
       return {
-        // Claves canonicas que consume el resto del tablero.
         "Marca temporal": item.createdDateTime || fields.Created || null,
-        "Cliente": lookupText(campo(fields, "cliente")),
-        "Fecha": campo(fields, "fecha") ?? null,
-        "Horas": campo(fields, "horas") ?? null,
-        "Requerimiento": clean(campo(fields, "requerimiento")),
-        "Tipo de actividad": lookupText(campo(fields, "actividad")),
-        // Regla de reporte: se muestra “Asignado a” cuando tiene valor.
+        "Cliente": valor(fields, "cliente", catClientes),
+        "Fecha": fields[interno("fecha")] ?? null,
+        "Horas": fields[interno("horas")] ?? null,
+        "Requerimiento": clean(fields[interno("requerimiento")]),
+        "Tipo de actividad": lookupText(fields[interno("actividad")]),
+        // Regla de reporte: se muestra "Asignado a" cuando tiene valor.
         "Desarrollador": asignadoA || horasDe,
-        "Nota": clean(campo(fields, "nota")),
+        "Nota": clean(fields[interno("nota")]),
         "Comentarios adicionales (uso interno)": "",
-        // Se conservan ambos nombres: el pago se calcula por “Horas de”.
+        // Se conservan ambos nombres: el pago se calcula por "Horas de".
         _horasDe: horasDe,
+        _horasDeCorreo: norm(autor.email || ""),
         _asignadoA: asignadoA,
         _itemId: item.id
       };
@@ -227,8 +256,18 @@ class GraphDataProvider extends DataProvider {
 
     if (!rows.length) warnings.push("La lista Timesheet no tiene registros todavía.");
 
-    let clients = await this.catalog(siteId, byName, "clients", warnings);
-    let consultants = await this.catalog(siteId, byName, "consultants", warnings);
+    // Diagnostico: se guarda la forma cruda de los primeros elementos, que es
+    // lo unico que permite ver como entrega Graph cada columna.
+    state.diagnostico = {
+      columnas: Object.fromEntries(Object.keys(APP.columns).map(k => [APP.columns[k], interno(k)])),
+      totalElementos: items.length,
+      catalogos: { clientes: catClientes.porId.size, consultores: catConsultores.porId.size },
+      muestra: items.slice(0, 3).map(i => ({ id: i.id, createdBy: i.createdBy?.user, fields: i.fields })),
+      convertidos: rows.slice(0, 3)
+    };
+
+    let clients = catClientes.valores;
+    let consultants = catConsultores.valores;
 
     // A partir de aqui se recorta lo que devuelve el proveedor segun el rol,
     // para que las horas ajenas no lleguen siquiera a la memoria del tablero.
@@ -236,16 +275,13 @@ class GraphDataProvider extends DataProvider {
     if (!state.isAdmin) {
       const miNombre = norm(state.me?.displayName);
       const miCorreo = norm(state.me?.mail || state.me?.userPrincipalName);
-      // Coincidencia exacta a proposito: una comparacion laxa podria dejar
-      // pasar los registros de otra persona con nombre parecido.
-      visibles = rows.filter(row => {
-        const quien = norm(row._horasDe);
-        return Boolean(quien) && (quien === miNombre || quien === miCorreo);
-      });
+      // El correo es la comparacion buena; el nombre queda como respaldo.
+      visibles = rows.filter(row =>
+        (row._horasDeCorreo && row._horasDeCorreo === miCorreo) ||
+        (Boolean(row._horasDe) && norm(row._horasDe) === miNombre));
       if (rows.length && !visibles.length) {
-        warnings.push(`No se encontraron horas capturadas a tu nombre (“${state.me?.displayName || "sin nombre"}”). Revisa que la columna “Horas de” de la lista Timesheet use tu nombre del directorio.`);
+        warnings.push(`No se encontraron horas capturadas a tu nombre (“${state.me?.displayName || "sin nombre"}”).`);
       }
-      // El consultor tampoco necesita ver el catalogo completo de colegas.
       consultants = unique(visibles.map(row => row._horasDe));
       clients = unique(visibles.map(row => row["Cliente"])).sort((a, b) => a.localeCompare(b, "es"));
     }
@@ -325,7 +361,12 @@ const auth = {
     let cuenta = this.client.getActiveAccount() || this.client.getAllAccounts()[0] || null;
     if (!cuenta) {
       // Si ya hay sesion de Microsoft 365 abierta, entra sin pedir contrasena.
-      try { cuenta = (await this.client.ssoSilent({ scopes: APP.graph.scopes })).account; }
+      // Con limite de tiempo: sin red, ssoSilent puede tardar ~20 s en rendirse.
+      const conLimite = (promesa, ms) => Promise.race([
+        promesa,
+        new Promise((_, rechazar) => setTimeout(() => rechazar(new Error("tiempo agotado")), ms))
+      ]);
+      try { cuenta = (await conLimite(this.client.ssoSilent({ scopes: APP.graph.scopes }), 8000)).account; }
       catch { cuenta = null; }
     }
     if (cuenta) this.client.setActiveAccount(cuenta);
@@ -356,17 +397,21 @@ const auth = {
 };
 
 function showGate(mensaje) {
-  const gate = document.getElementById("authGate");
-  const logo = document.getElementById("gateLogo");
-  const marca = document.querySelector(".brand__logo");
-  if (logo && marca && !logo.src) logo.src = marca.src;
-  gate.classList.add("show");
+  document.getElementById("authGate").classList.remove("auth-gate--oculto");
   const error = document.getElementById("authError");
   error.textContent = mensaje || "";
   error.classList.toggle("show", Boolean(mensaje));
 }
 
-function hideGate() { document.getElementById("authGate").classList.remove("show"); }
+function hideGate() { document.getElementById("authGate").classList.add("auth-gate--oculto"); }
+
+// Mientras se resuelve la sesion se muestra el circulo de progreso y se
+// esconde el boton: ofrecer "iniciar sesion" antes de tiempo solo confunde.
+function setGateChecking(activo) {
+  document.getElementById("authSpinner").hidden = !activo;
+  document.getElementById("authMsg").hidden = activo;
+  document.getElementById("signIn").hidden = activo;
+}
 
 function renderAccountChip() {
   const chip = document.getElementById("accountChip");
@@ -571,6 +616,7 @@ function updateAll() {
   renderClients(rows);
   renderConsultants(rows);
   renderApproval(rows);
+  renderDiagnostico();
   if (state.isAdmin) {
     renderClientBilling(rows);
     renderCollabBilling(rows);
@@ -944,6 +990,30 @@ function billingExportRows(type) {
   }));
 }
 
+// Vuelca la forma cruda de lo que entrega Graph. Existe porque adivinar como
+// devuelve SharePoint cada tipo de columna cuesta mas que mirarlo.
+function enDiagnostico() {
+  return new URLSearchParams(window.location.search).get("diagnostico") === "1";
+}
+
+function renderDiagnostico() {
+  const panel = document.getElementById("diagPanel");
+  if (!enDiagnostico()) { panel.hidden = true; return; }
+  panel.hidden = false;
+  const invalidos = state.invalidRows.map(r => ({
+    fila: r.rowNumber, id: r.id, razones: r.reasons,
+    fecha: r.original?.["Fecha"], horas: r.original?.["Horas"]
+  }));
+  document.getElementById("diagOut").textContent = JSON.stringify({
+    yo: state.me,
+    rol: state.isAdmin ? "Administrador" : "Consultor",
+    registrosValidos: state.records.length,
+    registrosInvalidos: invalidos,
+    avisos: state.warnings,
+    ...(state.diagnostico || {})
+  }, null, 2);
+}
+
 function toast(message) { const el=document.getElementById("toast");el.textContent=message;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),3200); }
 
 async function updateFromProvider(provider,{silent=false,successLabel="Fuente actualizada"}={}) {
@@ -1065,6 +1135,7 @@ async function init() {
 
   // Abierta desde el disco: no hay inicio de sesión posible, se muestra el modo demo.
   if (isDemo()) {
+    hideGate();
     document.getElementById("demoBanner").classList.add("show");
     document.getElementById("refreshNow").hidden = true;
     state.isAdmin = true;            // en demo se ve todo, para revisar el diseño
@@ -1073,9 +1144,16 @@ async function init() {
     return;
   }
 
+  // El porton se levanta ANTES de comprobar la sesion: nadie debe alcanzar a
+  // ver el tablero mientras se resuelve, aunque la red tarde en responder.
+  showGate();
+  setGateChecking(true);
   try {
-    if (!await auth.init()) { showGate(); return; }
+    const entro = await auth.init();
+    setGateChecking(false);
+    if (!entro) return;
   } catch (error) {
+    setGateChecking(false);
     showGate(error.message);
     return;
   }

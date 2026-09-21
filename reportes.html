@@ -32,11 +32,12 @@
 
   <div id="authGate" class="auth-gate" role="dialog" aria-modal="true" aria-labelledby="authGateTitle">
     <div class="auth-gate__card">
-      <div class="auth-gate__brand"><img id="gateLogo" class="auth-gate__logo" alt="CLARILIUM"></div>
+      <div class="auth-gate__brand"><img class="auth-gate__logo" src="assets/img/logo-nav-color.png" alt="CLARILIUM"></div>
       <div class="auth-gate__body">
         <h2 id="authGateTitle">Reportes de horas</h2>
-        <p>Inicia sesión con tu cuenta de CLARILIUM para consultar la información del TimeSheet.</p>
-        <button id="signIn" class="auth-gate__btn" type="button">Iniciar sesión con Microsoft</button>
+        <div id="authSpinner" class="auth-spinner"><span class="auth-spinner__circulo" aria-hidden="true"></span><span>Conectando con Microsoft Entra ID…</span></div>
+        <p id="authMsg" hidden>Inicia sesión con tu cuenta de CLARILIUM para consultar la información del TimeSheet.</p>
+        <button id="signIn" class="auth-gate__btn" type="button" hidden>Iniciar sesión con Microsoft</button>
         <div id="authError" class="auth-gate__error"></div>
       </div>
     </div>
@@ -133,10 +134,10 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="assets/js/vendor/xlsx.full.min.js"></script>
+  <script src="assets/js/vendor/xlsx.full.min.js" defer></script>
   <script src="assets/js/vendor/chart.umd.min.js"></script>
-  <script src="assets/js/vendor/jspdf.umd.min.js"></script>
-  <script src="assets/js/vendor/jspdf.plugin.autotable.min.js"></script>
+  <script src="assets/js/vendor/jspdf.umd.min.js" defer></script>
+  <script src="assets/js/vendor/jspdf.plugin.autotable.min.js" defer></script>
   <script src="assets/js/vendor/msal-browser.min.js"></script>
   <script src="assets/js/reportes.js"></script>
 </body>

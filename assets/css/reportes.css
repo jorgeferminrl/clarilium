@@ -271,9 +271,16 @@ body.dark .alert--warning { color: #ffd77b; background: #3b2a05; border-color: #
 
 /* ---- Capa de sesion y estado de origen (agregado al migrar a SharePoint) ---- */
   :root{ --cl-violeta:#9a36ff; --cl-violeta-claro:#b469ff; --cl-azul:#2493ed; --cl-oscuro:#040814; }
-  .auth-gate{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;background:#f4f6fb;}
+  /* Visible por omision: el porton se pinta con el HTML, sin esperar al
+     JavaScript, para que nadie alcance a ver el tablero antes de autenticar. */
+  .auth-gate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;background:#f4f6fb;}
   body.dark .auth-gate{background:var(--cl-oscuro);}
-  .auth-gate.show{display:flex;}
+  .auth-gate--oculto{display:none;}
+  .auth-spinner{display:flex;flex-direction:column;align-items:center;gap:14px;margin:4px 0 2px;font-size:.9rem;color:#4a5568;}
+  body.dark .auth-spinner{color:#aab4d4;}
+  .auth-spinner__circulo{width:34px;height:34px;border-radius:50%;border:3px solid rgba(154,54,255,.22);border-top-color:var(--cl-violeta);animation:auth-giro .9s linear infinite;}
+  @keyframes auth-giro{to{transform:rotate(360deg);}}
+  @media (prefers-reduced-motion: reduce){ .auth-spinner__circulo{animation-duration:2.4s;} }
   .auth-gate__card{width:100%;max-width:420px;background:#ffffff;border-radius:14px;overflow:hidden;text-align:center;box-shadow:0 18px 48px rgba(4,8,20,.22);}
   body.dark .auth-gate__card{background:#10182f;color:#eef2ff;box-shadow:0 18px 48px rgba(0,0,0,.5);}
   /* Banda de marca: el logotipo ya trae fondo oscuro, asi que la banda lo integra. */
