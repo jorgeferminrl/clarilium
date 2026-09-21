@@ -1,4 +1,4 @@
-:root{--reportes-version:"2026.09.20-6";}
+:root{--reportes-version:"2026.09.21-8";}
 :root {
   --clarilium-night: #040814;
   --clarilium-navy: #0D1728;
@@ -323,3 +323,28 @@ body.dark .diag pre{background:#040814;color:#cfe0ff;}
 .live-status::before{content:"";width:8px;height:8px;border-radius:50%;background:#2ecc71;}
 .live-status--error::before{background:#e5484d;}
 @media (max-width:900px){ .live-status{display:none !important;} }
+
+/* Segundo acceso externo: pegado al primero, sin repetir la linea divisoria */
+.nav-item--seguido{margin-top:0;border-top:0;padding-top:12px;}
+
+/* ---- Barra superior en pantallas angostas ----
+   Menu, logotipo, actualizar, cuenta y tema no caben en un celular: el logotipo
+   cede espacio y la etiqueta del rol se oculta (queda como descripcion del chip). */
+@media (max-width:720px){
+  .topbar__inner{max-width:100%;}
+  .brand{min-width:0;flex:0 1 auto;overflow:hidden;}
+  .brand__logo{max-width:100%;}
+  .topbar__actions{flex:none;}
+}
+@media (max-width:560px){
+  .account-chip__role{display:none;}
+  .account-chip{padding:5px 9px;}
+}
+@media (max-width:380px){
+  .brand__logo{width:112px;}
+  .topbar__inner{padding:0 10px;gap:6px;}
+  .topbar__actions{gap:5px;}
+}
+
+/* Encabezado del grupo de catalogos (solo administrador) */
+.nav-grupo{margin:18px 0 2px;padding:14px 16px 0;border-top:1px solid rgba(255,255,255,.12);font-size:.68rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.45);}

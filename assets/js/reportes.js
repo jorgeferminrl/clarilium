@@ -19,7 +19,16 @@ const APP = {
     sitePath: "/sites/timesheet",
     lists: { timesheet: "Timesheet", clients: "Clientes", consultants: "Consultores" },
     // Vista de la lista que se abre en la ventana emergente de captura.
-    listUrl: "https://clarilium.sharepoint.com/sites/timesheet/Lists/Timesheet/AllItems.aspx"
+    // Listas que se abren en ventana aparte desde el menu. "soloAdmin" oculta
+    // el acceso a quien no sea administrador; el permiso de escritura real se
+    // controla en SharePoint (Permisos de la lista), no aqui.
+    ventanas: {
+      timesheet:     { url: "https://clarilium.sharepoint.com/sites/timesheet/Lists/Timesheet/AllItems.aspx",     soloAdmin: false },
+      clientes:      { url: "https://clarilium.sharepoint.com/sites/timesheet/Lists/Clientes/AllItems.aspx",      soloAdmin: true },
+      consultores:   { url: "https://clarilium.sharepoint.com/sites/timesheet/Lists/Consultores/AllItems.aspx",   soloAdmin: true },
+      actividades:   { url: "https://clarilium.sharepoint.com/sites/timesheet/Lists/Actividades/AllItems.aspx",   soloAdmin: true },
+      destinatarios: { url: "https://clarilium.sharepoint.com/sites/timesheet/Lists/Destinatarios/AllItems.aspx", soloAdmin: true }
+    }
   },
   // Nombres visibles de las columnas de la lista Timesheet.
   // Los nombres internos se resuelven solos al arrancar, asi que los acentos y
@@ -299,6 +308,10 @@ class GraphDataProvider extends DataProvider {
       if (rows.length && !visibles.length) {
         warnings.push(`No se encontraron horas capturadas a tu nombre (“${state.me?.displayName || "sin nombre"}”).`);
       }
+      // Para el consultor, cada hora va a su propio nombre ("Horas de"). La regla
+      // "Asignado a" es para el reporte al cliente, que solo ve el administrador;
+      // aplicarla aqui metia en sus filtros y graficas el nombre de otra persona.
+      visibles = visibles.map(row => ({ ...row, "Desarrollador": row._horasDe || row["Desarrollador"] }));
       consultants = unique(visibles.map(row => row._horasDe));
       clients = unique(visibles.map(row => row["Cliente"])).sort((a, b) => a.localeCompare(b, "es"));
     }
@@ -439,7 +452,7 @@ function setGateChecking(activo) {
 
 // Version de los tres archivos. Se inyecta al publicar en el HTML, el CSS y
 // el JS a la vez; si no coinciden, la pagina lo dice en vez de fallar callada.
-const VERSION_REPORTES = "2026.09.20-6";
+const VERSION_REPORTES = "2026.09.21-8";
 
 function versionesPublicadas() {
   const html = document.querySelector('meta[name="reportes-version"]')?.content || "sin versión";
@@ -464,6 +477,7 @@ function renderAccountChip() {
   if (!auth.account) { chip.hidden = true; return; }
   document.getElementById("accountName").textContent = auth.account.name || auth.account.username || "";
   document.getElementById("accountRole").textContent = state.isAdmin ? "Administrador" : "Consultor";
+  chip.title = `${auth.account.name || auth.account.username || ""} · ${state.isAdmin ? "Administrador" : "Consultor"}`;
   chip.hidden = false;
 }
 
@@ -477,6 +491,8 @@ function applyRoleVisibility() {
     vista.hidden = !admin;
     if (!admin) vista.classList.remove("active");
   });
+  // Accesos a catalogos: solo el administrador los ve.
+  document.querySelectorAll("[data-solo-admin]").forEach(el => { el.hidden = !admin; });
   const actual = document.querySelector(".view.active")?.dataset.section;
   if (!admin && (!actual || SECCIONES_ADMIN.includes(actual))) setView("summary");
   renderAccountChip();
@@ -631,6 +647,18 @@ function collectFilters() {
     requirement: document.getElementById("filterRequirement").value,
     activity: document.getElementById("filterActivity").value
   };
+}
+
+// El periodo y el rango Desde/Hasta son dos formas de elegir fechas y no deben
+// combinarse: un rango fuera del mes elegido daba cero y parecia que no filtraba.
+// Elegir fechas pasa el periodo a "Todos los periodos"; elegir un periodo limpia
+// las fechas. No se fuerza el mes de la fecha porque un rango puede abarcar varios.
+function ajustarPeriodoYRango(id) {
+  const periodo = document.getElementById("filterPeriod");
+  const desde = document.getElementById("filterFrom");
+  const hasta = document.getElementById("filterTo");
+  if ((id === "filterFrom" || id === "filterTo") && (desde.value || hasta.value)) periodo.value = "";
+  if (id === "filterPeriod" && periodo.value) { desde.value = ""; hasta.value = ""; }
 }
 
 function resetFiltersToDefaults() {
@@ -1167,31 +1195,42 @@ function marcarEnVivo(error) {
 /* ------------------------------------------------------------------ *
  * Ventana emergente de captura (la lista de SharePoint)
  * ------------------------------------------------------------------ */
-let ventanaTimesheet = null;
+const ventanas = {};
 
-function abrirTimesheet() {
-  if (ventanaTimesheet && !ventanaTimesheet.closed) { ventanaTimesheet.focus(); return; }
-  // Se acomoda en la mitad derecha de la pantalla, para ver los reportes a la izquierda.
+// Abre una lista de SharePoint en una ventana aparte, acomodada en la mitad
+// derecha de la pantalla para seguir viendo los reportes a la izquierda.
+function abrirVentana(clave, url) {
+  const abierta = ventanas[clave];
+  if (abierta && !abierta.closed) { abierta.focus(); return; }
   const ancho = Math.round(Math.min(Math.max(window.screen.availWidth * 0.45, 520), 960));
   const alto = window.screen.availHeight;
   const izquierda = (window.screen.availLeft || 0) + window.screen.availWidth - ancho;
   const arriba = window.screen.availTop || 0;
-  ventanaTimesheet = window.open(APP.graph.listUrl, "clariliumTimesheet",
+  const ventana = window.open(url, "clarilium_" + clave,
     `popup=yes,width=${ancho},height=${alto},left=${izquierda},top=${arriba}`);
-  if (!ventanaTimesheet) {
+  if (!ventana) {
     toast("El navegador bloqueó la ventana emergente. Permite ventanas emergentes para www.clarilium.com.");
     return;
   }
+  ventanas[clave] = ventana;
   // Al cerrarse la ventana, se revisa de inmediato si hubo cambios.
-  clearInterval(abrirTimesheet.vigia);
-  abrirTimesheet.vigia = setInterval(() => {
-    if (!ventanaTimesheet || ventanaTimesheet.closed) {
-      clearInterval(abrirTimesheet.vigia);
-      ventanaTimesheet = null;
+  clearInterval(abrirVentana["vigia_" + clave]);
+  abrirVentana["vigia_" + clave] = setInterval(() => {
+    if (!ventanas[clave] || ventanas[clave].closed) {
+      clearInterval(abrirVentana["vigia_" + clave]);
+      ventanas[clave] = null;
       revisarCambios();
     }
   }, 1000);
 }
+
+// Un solo manejador para todos los accesos del menu: cada boton dice que lista abre.
+function abrirLista(clave) {
+  const lista = APP.graph.ventanas[clave];
+  if (!lista || (lista.soloAdmin && !state.isAdmin)) return;
+  abrirVentana(clave, lista.url);
+}
+
 
 function navigateToView(view) {
   setView(view);
@@ -1202,7 +1241,7 @@ function bindEvents() {
   document.querySelectorAll("[data-view]").forEach(el=>el.addEventListener("click",()=>navigateToView(el.dataset.view)));
   document.getElementById("kpiGrid").addEventListener("click",e=>{const card=e.target.closest("[data-kpi-view]");if(card)navigateToView(card.dataset.kpiView);});
   document.getElementById("menuToggle").addEventListener("click",e=>{const open=document.getElementById("sidebar").classList.toggle("open");e.currentTarget.setAttribute("aria-expanded",String(open));});
-  ["filterPeriod","filterFrom","filterTo","filterClient","filterConsultant","filterRequirement","filterActivity"].forEach(id=>document.getElementById(id).addEventListener("change",updateAll));
+  ["filterPeriod","filterFrom","filterTo","filterClient","filterConsultant","filterRequirement","filterActivity"].forEach(id=>document.getElementById(id).addEventListener("change",()=>{ajustarPeriodoYRango(id);updateAll();}));
   document.getElementById("clearFilters").addEventListener("click",resetFiltersToDefaults);
   document.querySelector('[data-for="clientChart"]').addEventListener("click",e=>{const button=e.target.closest("[data-client]");if(button)showClientDetail(button.dataset.client);});
   document.querySelector('[data-for="consultantChart"]').addEventListener("click",e=>{const button=e.target.closest("[data-consultant]");if(button)showConsultantDetail(button.dataset.consultant);});
@@ -1232,7 +1271,8 @@ function bindEvents() {
   // Al volver a la pagina (por ejemplo, desde la ventana de captura) se revisa al instante.
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)revisarCambios();});
   window.addEventListener("focus",()=>revisarCambios());
-  document.getElementById("openTimesheet").addEventListener("click", abrirTimesheet);
+  document.querySelectorAll("[data-ventana]").forEach(boton =>
+    boton.addEventListener("click", () => abrirLista(boton.dataset.ventana)));
   document.getElementById("refreshNow").addEventListener("click",()=>refreshRemoteData({force:true}));
   document.getElementById("signIn").addEventListener("click",()=>auth.signIn());
   document.getElementById("signOut").addEventListener("click",()=>auth.signOut());
