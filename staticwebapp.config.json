@@ -97,11 +97,18 @@
     },
     {
       "route": "/timesheet",
-      "rewrite": "/timesheet.html"
+      "redirect": "/reportes",
+      "statusCode": 302
     },
     {
       "route": "/timesheet/*",
-      "rewrite": "/timesheet.html"
+      "redirect": "/reportes",
+      "statusCode": 302
+    },
+    {
+      "route": "/timesheet.html",
+      "redirect": "/reportes",
+      "statusCode": 302
     },
     {
       "route": "/reportes",
