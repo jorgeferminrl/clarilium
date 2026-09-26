@@ -6,11 +6,11 @@
   <meta name="theme-color" content="#040814">
   <meta name="description" content="Dashboard empresarial para análisis, aprobación y facturación de horas CLARILIUM.">
   <title>TimeSheet · CLARILIUM</title>
-  <meta name="reportes-version" content="2026.09.25-1">
+  <meta name="timesheet-version" content="2026.09.26-1">
   <meta name="robots" content="noindex">
   <link rel="icon" href="assets/img/favicon-32.png" sizes="32x32">
   <meta name="theme-color" content="#040814">
-  <link rel="stylesheet" href="assets/css/reportes.css">
+  <link rel="stylesheet" href="assets/css/timesheet.css">
 </head>
 <body>
   <a class="skip-link" href="#main">Saltar al contenido</a>
@@ -107,7 +107,7 @@
       <section id="view-consultants" class="view" data-section="consultants">
         <div class="section-heading"><div><p class="eyebrow">CAPACIDAD</p><h1>Horas por consultor</h1></div><p class="section-context">La capacidad se configura por colaborador y periodo.</p></div>
         <div class="consultant-focus">
-          <label class="consultant-focus__control" for="consultantFocus">Consultor<select id="consultantFocus"></select></label>
+          <label class="consultant-focus__control" for="consultantFocus" data-solo-admin>Consultor<select id="consultantFocus"></select></label>
           <div id="consultantFocusKpis" class="kpi-grid"></div>
         </div>
         <div class="chart-grid">
@@ -157,6 +157,6 @@
   <script src="assets/js/vendor/jspdf.umd.min.js" defer></script>
   <script src="assets/js/vendor/jspdf.plugin.autotable.min.js" defer></script>
   <script src="assets/js/vendor/msal-browser.min.js"></script>
-  <script src="assets/js/reportes.js"></script>
+  <script src="assets/js/timesheet.js"></script>
 </body>
 </html>
