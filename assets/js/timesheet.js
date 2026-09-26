@@ -81,7 +81,7 @@ const saved = readStorage();
 const state = {
   records: [], invalidRows: [], rawRows: [], catalogs: { clients: [], developers: [] }, warnings: [],
   sourceName: "SharePoint", isAdmin: false, me: null, loadedAt: null, syncStatus: "loading", syncError: "", refreshPromise: null, dataSignature: "", filters: {}, charts: {},
-  selectedClient: "", selectedConsultant: "", selectedConsultantClient: "",
+  selectedClient: "", selectedConsultant: "", selectedConsultantClient: "", focusConsultant: "",
   clientRates: Array.isArray(saved.clientRates) ? saved.clientRates : [],
   collabRates: Array.isArray(saved.collabRates) ? saved.collabRates : [],
   manualAssignments: saved.manualAssignments || {},
@@ -342,6 +342,12 @@ class DemoDataProvider extends DataProvider {
       if (fecha.getUTCDay() === 0 || fecha.getUTCDay() === 6) continue;
       for (let n = 0, total = 1 + azar(3); n < total; n += 1) {
         const quien = consultants[azar(consultants.length)];
+        // Uno de cada cuatro registros se reporta a nombre de otro consultor, para
+        // que los mosaicos de "asignadas a otros" tengan algo que mostrar en demo.
+        const cruzado = azar(4) === 0;
+        const otro = cruzado
+          ? consultants[(consultants.indexOf(quien) + 1 + azar(consultants.length - 1)) % consultants.length]
+          : "";
         rows.push({
           "Marca temporal": fecha.toISOString(),
           "Cliente": clients[azar(clients.length)],
@@ -349,11 +355,11 @@ class DemoDataProvider extends DataProvider {
           "Horas": 1 + azar(7),
           "Requerimiento": String(4100 + azar(90)),
           "Tipo de actividad": activities[azar(activities.length)],
-          "Desarrollador": quien,
+          "Desarrollador": otro || quien,
           "Nota": "Registro de ejemplo, no corresponde a datos reales.",
           "Comentarios adicionales (uso interno)": "",
           _horasDe: quien,
-          _asignadoA: "",
+          _asignadoA: otro,
           _itemId: `demo-${rows.length + 1}`
         });
       }
@@ -385,7 +391,7 @@ const auth = {
       },
       // localStorage: la sesion sobrevive a recargas y pestanas nuevas, asi
       // que no hay que volver a entrar ni esperar la verificacion silenciosa.
-      // Es aceptable porque la politica de seguridad de /reportes solo admite
+      // Es aceptable porque la politica de seguridad de /timesheet solo admite
       // scripts del propio sitio.
       cache: { cacheLocation: "localStorage" }
     });
@@ -452,13 +458,13 @@ function setGateChecking(activo) {
 
 // Version de los tres archivos. Se inyecta al publicar en el HTML, el CSS y
 // el JS a la vez; si no coinciden, la pagina lo dice en vez de fallar callada.
-const VERSION_REPORTES = "2026.09.21-8";
+const VERSION_TIMESHEET = "2026.09.26-1";
 
 function versionesPublicadas() {
-  const html = document.querySelector('meta[name="reportes-version"]')?.content || "sin versión";
+  const html = document.querySelector('meta[name="timesheet-version"]')?.content || "sin versión";
   const css = getComputedStyle(document.documentElement)
-    .getPropertyValue("--reportes-version").trim().replace(/["']/g, "") || "sin versión";
-  return { html, css, js: VERSION_REPORTES };
+    .getPropertyValue("--timesheet-version").trim().replace(/["']/g, "") || "sin versión";
+  return { html, css, js: VERSION_TIMESHEET };
 }
 
 // Muestra un fallo en el porton. Nada aqui puede lanzar otro error: es la
@@ -796,7 +802,70 @@ function hideClientDetail() {
   document.getElementById("clientDetailBody").innerHTML="";
 }
 
+/* ------------------------------------------------------------------ *
+ * Foco por consultor: el selector y los tres mosaicos de esta vista.
+ *
+ * Aqui el consultor NO es la columna "Desarrollador" (que ya trae aplicada la
+ * regla de reporte al cliente), sino "Horas de": quien capturo la hora y a
+ * quien hay que pagarsela. El reparto entre los dos mosaicos separa lo que se
+ * reporta a su nombre de lo que se reporta al de otra persona.
+ * ------------------------------------------------------------------ */
+function horasDeDe(record) { return clean(record.original?._horasDe) || record.consultant; }
+function asignadoADe(record) { return clean(record.original?._asignadoA); }
+
+// Se arma con todos los registros visibles, no con los filtrados, para que la
+// lista no cambie de contenido cada vez que se mueve un filtro.
+function focusConsultantOptions() {
+  return unique(state.records.map(horasDeDe)).sort((a, b) => a.localeCompare(b, "es"));
+}
+
+function focusTotals(rows, consultor) {
+  const propias = [], ajenas = [];
+  rows.forEach(record => {
+    const horasDe = horasDeDe(record);
+    if (norm(horasDe) !== norm(consultor)) return;
+    const asignadoA = asignadoADe(record);
+    // Sin "Asignado a", o con el mismo nombre, la hora se reporta a su nombre.
+    if (!asignadoA || norm(asignadoA) === norm(horasDe)) propias.push(record);
+    else ajenas.push(record);
+  });
+  return { propias: sum(propias), ajenas: sum(ajenas), nPropias: propias.length, nAjenas: ajenas.length };
+}
+
+function renderConsultantFocus(rows) {
+  const selector = document.getElementById("consultantFocus");
+  const mosaicos = document.getElementById("consultantFocusKpis");
+  const opciones = focusConsultantOptions();
+  if (!opciones.length) {
+    selector.innerHTML = `<option value="">Sin consultores</option>`;
+    selector.disabled = true;
+    mosaicos.innerHTML = `<p class="empty-cell">No hay horas capturadas todavía.</p>`;
+    return;
+  }
+  selector.disabled = false;
+  if (!state.isAdmin) {
+    // El consultor no elige: sus registros son los unicos que le llegan, asi que
+    // la lista trae un solo nombre y el selector va oculto (data-solo-admin).
+    state.focusConsultant = opciones[0];
+  } else if (!opciones.includes(state.focusConsultant)) {
+    // El administrador arranca en su propio nombre cuando aparece en la lista;
+    // si no captura horas, cae en el primero por orden alfabetico.
+    state.focusConsultant = opciones.find(nombre => norm(nombre) === norm(state.me?.displayName)) || opciones[0];
+  }
+  selector.innerHTML = opciones.map(nombre => `<option value="${esc(nombre)}"${nombre === state.focusConsultant ? " selected" : ""}>${esc(nombre)}</option>`).join("");
+  selector.value = state.focusConsultant;
+  const t = focusTotals(rows, state.focusConsultant);
+  const registros = n => `${n} ${n === 1 ? "registro" : "registros"}`;
+  const kpis = [
+    ["Total de horas trabajadas", fmtHours(t.propias + t.ajenas), `${registros(t.nPropias + t.nAjenas)} · según los filtros`],
+    ["Horas trabajadas asignadas a mí", fmtHours(t.propias), `${registros(t.nPropias)} a su propio nombre`],
+    ["Horas trabajadas asignadas a otros", fmtHours(t.ajenas), `${registros(t.nAjenas)} reportados a otro consultor`]
+  ];
+  mosaicos.innerHTML = kpis.map(([label, value, foot]) => `<div class="kpi"><span class="kpi__label">${esc(label)}</span><strong class="kpi__value">${esc(value)}</strong><span class="kpi__foot">${esc(foot)}</span></div>`).join("");
+}
+
 function renderConsultants(rows) {
+  renderConsultantFocus(rows);
   const total = sum(rows);
   const items = [...groupBy(rows,r=>r.consultant || "Sin consultor")].map(([name,data])=>{
     const capacity = capacityFor(name, state.filters.period || monthKey(data[0]?.date));
@@ -1239,6 +1308,10 @@ function navigateToView(view) {
 
 function bindEvents() {
   document.querySelectorAll("[data-view]").forEach(el=>el.addEventListener("click",()=>navigateToView(el.dataset.view)));
+  document.getElementById("consultantFocus").addEventListener("change", event => {
+    state.focusConsultant = event.target.value;
+    renderConsultantFocus(applyFilters(state.records));
+  });
   document.getElementById("kpiGrid").addEventListener("click",e=>{const card=e.target.closest("[data-kpi-view]");if(card)navigateToView(card.dataset.kpiView);});
   document.getElementById("menuToggle").addEventListener("click",e=>{const open=document.getElementById("sidebar").classList.toggle("open");e.currentTarget.setAttribute("aria-expanded",String(open));});
   ["filterPeriod","filterFrom","filterTo","filterClient","filterConsultant","filterRequirement","filterActivity"].forEach(id=>document.getElementById(id).addEventListener("change",()=>{ajustarPeriodoYRango(id);updateAll();}));
@@ -1298,7 +1371,7 @@ async function init() {
   try {
     await iniciar();
   } catch (error) {
-    console.error("Reportes: fallo al iniciar", error);
+    console.error("TimeSheet: fallo al iniciar", error);
     mostrarFalla(`No se pudo iniciar la página. ${error.message}`);
   } finally {
     clearTimeout(vigilante);
@@ -1307,8 +1380,8 @@ async function init() {
 
 async function iniciar() {
   const v = versionesPublicadas();
-  if (v.html !== VERSION_REPORTES || v.css !== VERSION_REPORTES) {
-    throw new Error(`Los archivos publicados no coinciden entre sí (página ${v.html}, estilos ${v.css}, código ${v.js}). Hay que volver a publicar reportes.html, reportes.css y reportes.js juntos.`);
+  if (v.html !== VERSION_TIMESHEET || v.css !== VERSION_TIMESHEET) {
+    throw new Error(`Los archivos publicados no coinciden entre sí (página ${v.html}, estilos ${v.css}, código ${v.js}). Hay que volver a publicar timesheet.html, timesheet.css y timesheet.js juntos.`);
   }
   document.body.classList.toggle("dark",saved.theme==="dark");
   bindEvents();

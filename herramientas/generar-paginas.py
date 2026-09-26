@@ -354,14 +354,11 @@ ANCLA = {'es': {'inicio': 'inicio', 'nosotros': 'nosotros', 'contacto': 'contact
 # aquí y se vuelve a correr este script: es el único lugar donde está escrito.
 SITIO = 'https://www.clarilium.com'
 
-# Lista de SharePoint donde se registran las horas. La pagina /timesheet del
-# sitio publico no es mas que un salto hacia aqui: quien llegue tiene que
-# iniciar sesion con una cuenta del tenant de CLARILIUM.
-# Apunta a la lista y no al sitio (.../sites/timesheet/) a proposito: la
-# pagina de inicio del sitio depende de estar publicada, y mientras tenga un
-# borrador sin publicar los demas usuarios ven una version vieja y el
-# formulario guarda en el vacio sin marcar error.
-TIMESHEET = 'https://clarilium.sharepoint.com/sites/timesheet/Lists/Timesheet/AllItems.aspx'
+# timesheet.html ya NO se genera aqui. Esa direccion la sirve el tablero del
+# TimeSheet, que se mantiene a mano junto con assets/css/reportes.css y
+# assets/js/reportes.js. Si este generador volviera a escribirlo, borraria el
+# tablero completo de un solo golpe. La direccion de la lista de SharePoint
+# vive dentro de assets/js/reportes.js, en APP.graph.lists.
 
 URL_SERVICIO = {'es': SITIO + '/servicios/{}',
                 'en': SITIO + '/en/services/{}'}
@@ -856,59 +853,6 @@ def pagina_404():
 {CIERRE.replace('{p}', p)}'''
 
 
-def pagina_timesheet():
-    """Salto hacia el SharePoint del TimeSheet. Azure Static Web Apps no admite
-    redirecciones a dominios externos desde staticwebapp.config.json (responde
-    404), asi que el salto se hace con una pagina real y un meta refresh."""
-    t = TEXTOS['es']
-    p = '/'
-    cab = cabecera('es', p, '/en/index.html', 'en')
-    return f'''<!DOCTYPE html>
-<html lang="es-MX" data-idioma="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TimeSheet — CLARILIUM</title>
-<meta name="robots" content="noindex">
-<meta http-equiv="refresh" content="0; url={TIMESHEET}">
-
-<link rel="icon" href="/assets/img/favicon-32.png" sizes="32x32">
-<meta name="theme-color" content="#040814">
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700;0,900;1,700&family=Roboto:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="/assets/css/styles.css">
-
-<script>
-{SCRIPT_TEMA}
-</script>
-</head>
-<body>
-
-{cab}
-
-<main id="contenido">
-
-  <section class="seccion error">
-    <div class="contenedor">
-      <h1>TimeSheet</h1>
-      <p>Te estamos llevando al portal de registro de horas.<br>
-         Si no abre solo en unos segundos, usa el botón.</p>
-      <a class="boton" href="{TIMESHEET}">Abrir el TimeSheet</a>
-      <p class="error__en" lang="en">
-        <strong>Sign-in required.</strong> Use your CLARILIUM account.
-      </p>
-    </div>
-  </section>
-
-</main>
-
-{pie('es', p)}
-
-{CIERRE.replace('{p}', p)}'''
-
-
 # ------------------------------------------- reescritura de las portadas ----
 
 def sincronizar_portada(ruta, idioma, p, otro, otroParam):
@@ -989,9 +933,6 @@ if __name__ == '__main__':
 
     (RAIZ / '404.html').write_text(pagina_404(), encoding='utf-8')
     print('escrito 404.html')
-
-    (RAIZ / 'timesheet.html').write_text(pagina_timesheet(), encoding='utf-8')
-    print('escrito timesheet.html')
 
     sincronizar_portada('index.html', 'es', '', 'en/index.html', 'en')
     sincronizar_portada('en/index.html', 'en', '../', '../index.html', 'es')

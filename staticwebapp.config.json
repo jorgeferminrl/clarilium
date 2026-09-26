@@ -97,31 +97,24 @@
     },
     {
       "route": "/timesheet",
-      "redirect": "/reportes",
-      "statusCode": 302
-    },
-    {
-      "route": "/timesheet/*",
-      "redirect": "/reportes",
-      "statusCode": 302
+      "rewrite": "/timesheet.html",
+      "headers": {
+        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://graph.microsoft.com https://login.microsoftonline.com; frame-src https://login.microsoftonline.com; form-action 'self' https://login.microsoftonline.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
+      }
     },
     {
       "route": "/timesheet.html",
-      "redirect": "/reportes",
-      "statusCode": 302
+      "headers": {
+        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://graph.microsoft.com https://login.microsoftonline.com; frame-src https://login.microsoftonline.com; form-action 'self' https://login.microsoftonline.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
+      }
     },
     {
       "route": "/reportes",
-      "rewrite": "/reportes.html",
-      "headers": {
-        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://graph.microsoft.com https://login.microsoftonline.com; frame-src https://login.microsoftonline.com; form-action 'self' https://login.microsoftonline.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
-      }
+      "statusCode": 404
     },
     {
       "route": "/reportes.html",
-      "headers": {
-        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://graph.microsoft.com https://login.microsoftonline.com; frame-src https://login.microsoftonline.com; form-action 'self' https://login.microsoftonline.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
-      }
+      "statusCode": 404
     },
     {
       "route": "/herramientas/*",
