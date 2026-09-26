@@ -1,4 +1,4 @@
-:root{--reportes-version:"2026.09.21-8";}
+:root{--timesheet-version:"2026.09.26-1";}
 :root {
   --clarilium-night: #040814;
   --clarilium-navy: #0D1728;
@@ -348,3 +348,9 @@ body.dark .diag pre{background:#040814;color:#cfe0ff;}
 
 /* Encabezado del grupo de catalogos (solo administrador) */
 .nav-grupo{margin:18px 0 2px;padding:14px 16px 0;border-top:1px solid rgba(255,255,255,.12);font-size:.68rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.45);}
+/* Foco por consultor: selector y mosaicos de "Horas por consultor". */
+.consultant-focus { margin: 0 0 22px; }
+.consultant-focus__control { max-width: 320px; margin: 0 0 14px; }
+/* label trae display:grid, que le gana al atributo hidden de data-solo-admin. */
+.consultant-focus__control[hidden] { display: none; }
+.consultant-focus .kpi-grid { margin-bottom: 0; }
