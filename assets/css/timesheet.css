@@ -362,6 +362,9 @@ body.dark .diag pre{background:#040814;color:#cfe0ff;}
 @media (max-width:600px){ .lang-button{width:auto;padding:0 9px;gap:4px;} }
 @media (max-width:380px){ .lang-button svg{display:none;} .brand__logo{width:100px;} }
 
-/* Con el boton de idioma, la barra trae mas elementos: por debajo de 1440px
-   el titulo centrado chocaba con "En vivo" y la cuenta, asi que se oculta. */
-@media (max-width:1440px){ .topbar__title{display:none;} }
+/* Titulo "TIMESHEET" junto al logotipo (ya no centrado): asi nunca se encima
+   con "En vivo", la cuenta ni los botones. El margen automatico empuja los
+   botones a la derecha. Cuando ya no cabe junto a todo lo demas, se oculta. */
+.topbar__title{position:static;left:auto;transform:none;margin-right:auto;padding-left:20px;border-left:1px solid #2a3350;white-space:nowrap;font-size:1.05rem;letter-spacing:.16em;}
+@media (min-width:721px){ .brand{flex:none;} }
+@media (max-width:1180px){ .topbar__title{display:none !important;} }
