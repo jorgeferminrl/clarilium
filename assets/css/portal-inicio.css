@@ -1,0 +1,206 @@
+/* Pagina principal del portal interno · www.clarilium.com/portal
+   Replica la barra superior, el menu lateral y los paneles del TimeSheet
+   (timesheet.css). Sin estilos en linea: la politica de contenido no los admite. */
+:root {
+  --clarilium-night: #040814;
+  --clarilium-navy: #0D1728;
+  --clarilium-purple: #9440FF;
+  --clarilium-purple-dark: #8A3DF0;
+  --clarilium-purple-soft: #B564FF;
+  --clarilium-blue: #2590E7;
+  --clarilium-white: #FFFFFF;
+  --clarilium-surface: #F7F7F8;
+  --clarilium-gray: #D1D2D4;
+  --clarilium-border: #E3E5EA;
+  --clarilium-text: #0A1020;
+  --clarilium-muted: #667085;
+  --danger: #B42318;
+  --surface: var(--clarilium-white);
+  --surface-soft: var(--clarilium-surface);
+  --text: var(--clarilium-text);
+  --muted: var(--clarilium-muted);
+  --border: var(--clarilium-border);
+  --header-height: 84px;
+  --sidebar-width: 252px;
+  color-scheme: light;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+body.dark {
+  --surface: var(--clarilium-navy);
+  --surface-soft: var(--clarilium-night);
+  --text: var(--clarilium-white);
+  --muted: var(--clarilium-gray);
+  --border: #263249;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; overflow-x: hidden; background: var(--surface-soft); color: var(--text); font-size: 16px; line-height: 1.5; }
+img { max-width: 100%; }
+button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+a { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 3px solid rgba(148, 64, 255, .34); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.skip-link { position: fixed; top: -48px; left: 16px; z-index: 999; padding: 10px 14px; background: #fff; color: #040814; border-radius: 6px; }
+.skip-link:focus { top: 10px; }
+.demo-banner { padding: 9px 16px; text-align: center; font-size: .83rem; font-weight: 600; letter-spacing: .02em; background: #b469ff; color: #040814; }
+
+/* ---- Barra superior (igual que el TimeSheet) ---- */
+.topbar { position: sticky; top: 0; z-index: 100; height: var(--header-height); background: var(--clarilium-night); color: #fff; box-shadow: 0 8px 24px rgba(4,8,20,.16); }
+.topbar__inner { position: relative; height: 78px; max-width: 1800px; margin: auto; padding: 0 26px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.brand { display: flex; align-items: center; min-width: 0; }
+.brand__logo { display: block; width: auto; height: 56px; max-width: 228px; object-fit: contain; object-position: left center; }
+.topbar__title { position: absolute; left: 50%; transform: translateX(-50%); color: #fff; font-size: 1.2rem; font-weight: 850; letter-spacing: .18em; line-height: 1; white-space: nowrap; pointer-events: none; }
+.topbar__actions { display: flex; align-items: center; gap: 10px; flex: none; }
+.identity-strip { height: 6px; background: var(--clarilium-purple); }
+.icon-button { width: 42px; height: 42px; border: 1px solid #344057; border-radius: 8px; background: #121c2d; color: #fff; display: grid; place-items: center; }
+.icon-button:hover { border-color: var(--clarilium-purple-soft); }
+.icon-button.girando-icono { animation: giro 1s linear infinite; }
+.account-chip { display: inline-flex; align-items: center; gap: 8px; max-width: 250px; padding: 5px 10px; border-radius: 999px; background: rgba(255,255,255,.14); color: inherit; font-size: .8rem; }
+.account-chip__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-chip__role { opacity: .75; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; }
+.account-chip__out { border: 0; background: transparent; color: inherit; font-size: .75rem; text-decoration: underline; opacity: .85; padding: 0; }
+.account-chip__out:hover { opacity: 1; }
+
+/* ---- Menu lateral ---- */
+.app-shell { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: calc(100vh - var(--header-height)); }
+.sidebar { position: sticky; top: var(--header-height); height: calc(100vh - var(--header-height)); display: flex; flex-direction: column; background: var(--clarilium-navy); color: #fff; padding: 26px 16px 20px; overflow-y: auto; }
+.sidebar nav { display: grid; gap: 5px; }
+.nav-item { width: 100%; border-left: 3px solid transparent; border-radius: 6px; background: transparent; color: var(--clarilium-gray); padding: 12px 12px; display: flex; align-items: center; gap: 8px; text-align: left; font-size: .9rem; text-decoration: none; }
+.nav-item:hover { background: rgba(148,64,255,.16); border-left-color: var(--clarilium-purple); color: #fff; }
+
+/* ---- Contenido ---- */
+.main { min-width: 0; width: 100%; max-width: 1540px; margin: 0 auto; padding: 34px clamp(18px, 3vw, 48px) 72px; }
+.main:focus { outline: none; }
+.section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 22px; margin: 0 0 24px; }
+.section-heading h1 { margin: 0; font-size: clamp(1.9rem, 3vw, 3.15rem); line-height: 1.04; letter-spacing: -.045em; color: var(--text); }
+.eyebrow { margin: 0 0 6px; color: var(--clarilium-purple); font-size: .75rem; font-weight: 800; letter-spacing: .16em; }
+.section-context { max-width: 520px; margin: 0; text-align: right; color: var(--muted); font-size: .88rem; }
+.section-context--error { color: var(--danger); }
+.panel { min-width: 0; width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 26px rgba(13,23,40,.05); padding: 22px; }
+.panel__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.panel__head h3 { margin: 0; color: var(--text); font-size: 1.02rem; }
+.button { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 7px; border: 1px solid transparent; padding: 8px 14px; font-weight: 750; font-size: .875rem; text-decoration: none; white-space: nowrap; }
+.button--outline { background: transparent; color: var(--text); border-color: var(--border); }
+.button--outline:hover { border-color: var(--clarilium-purple); color: var(--clarilium-purple); }
+
+/* ---- Aviso critico: mismo texto y formato que el correo de recordatorio ---- */
+.aviso { margin: 0 0 26px; padding: 20px 24px 22px; background: #fff; color: #000; border: 1px solid #f3c7c3; border-left: 6px solid var(--danger); border-radius: 8px; box-shadow: 0 8px 26px rgba(13,23,40,.08); font-family: Arial, Helvetica, sans-serif; font-size: 1rem; line-height: 1.5; }
+.aviso p { margin: 0 0 14px; }
+.aviso .aviso__etiqueta { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; color: var(--danger); font-family: Inter, "Segoe UI", Arial, sans-serif; font-size: .75rem; font-weight: 800; letter-spacing: .16em; }
+.aviso__etiqueta::before { content: "!"; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--danger); color: #fff; font-size: .75rem; letter-spacing: 0; }
+.aviso ul { margin: 0 0 14px; padding-left: 30px; }
+.aviso li { font-weight: 700; }
+.aviso li::marker { color: #9a36ff; }
+.aviso .aviso__firma { margin: 0; font-weight: 700; }
+.aviso a { font-weight: 700; text-decoration: none; }
+.aviso a:hover, .aviso a:focus-visible { text-decoration: underline; }
+.aviso__sy { color: #003366; }
+.aviso__support { color: #00c47e; }
+.aviso__sysupport:hover { text-decoration-color: #003366; }
+.aviso__clarilium { color: #9a36ff; }
+
+/* ---- Noticias ---- */
+.news-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+.news-list { list-style: none; margin: 0; padding: 0; }
+.news-item { padding: 16px 0; border-top: 1px solid var(--border); }
+.news-item:first-child { padding-top: 0; border-top: 0; }
+.news-item:last-child { padding-bottom: 0; }
+.news-item__title { color: var(--text); font-weight: 750; font-size: 1rem; line-height: 1.35; text-decoration: none; overflow-wrap: anywhere; }
+.news-item__title:hover { color: var(--clarilium-purple); text-decoration: underline; }
+body.dark .news-item__title:hover { color: var(--clarilium-purple-soft); }
+.news-item__meta { display: block; margin-top: 5px; color: var(--muted); font-size: .75rem; }
+.news-item__summary { margin: 6px 0 0; color: var(--muted); font-size: .85rem; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.news-empty { color: var(--muted); font-size: .88rem; }
+.news-empty--error { color: var(--danger); }
+body.dark .news-empty--error { color: #fca5a5; }
+.skeleton { display: block; height: 14px; margin: 0 0 10px; border-radius: 5px; background: var(--border); position: relative; overflow: hidden; }
+.skeleton--corta { width: 55%; }
+.skeleton::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent); animation: brillo 1.2s infinite; transform: translateX(-100%); }
+@keyframes brillo { to { transform: translateX(100%); } }
+
+/* ---- Porton de inicio de sesion (mismo aspecto que el TimeSheet) ---- */
+.porton { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 24px; background: #f4f6fb; }
+body.dark .porton { background: var(--clarilium-night); }
+.porton--oculto { display: none; }
+.porton__tarjeta { width: 100%; max-width: 420px; background: #fff; border-radius: 14px; overflow: hidden; text-align: center; box-shadow: 0 18px 48px rgba(4,8,20,.22); }
+body.dark .porton__tarjeta { background: #10182f; color: #eef2ff; box-shadow: 0 18px 48px rgba(0,0,0,.5); }
+.porton__marca { background: var(--clarilium-night); padding: 26px 24px; }
+.porton__logo { width: 210px; max-width: 78%; height: auto; margin: 0 auto; display: block; }
+.porton__cuerpo { padding: 28px 32px 32px; }
+.porton__cuerpo h2 { margin: 0 0 10px; font-size: 1.25rem; color: var(--clarilium-night); }
+body.dark .porton__cuerpo h2 { color: #eef2ff; }
+.porton__cuerpo p { margin: 0 0 22px; font-size: .92rem; line-height: 1.5; color: #4a5568; }
+body.dark .porton__cuerpo p { color: #aab4d4; }
+.porton__btn { display: inline-flex; align-items: center; gap: 10px; border: 0; background: #9a36ff; color: #fff; font-weight: 600; padding: 12px 22px; border-radius: 8px; }
+.porton__btn:hover { background: #b469ff; }
+.porton__error { margin-top: 18px; padding: 12px 14px; border-radius: 8px; background: #fdecec; color: #8c1c1c; font-size: .85rem; text-align: left; line-height: 1.45; }
+.porton__error + .porton__btn { margin-top: 16px; }
+.girando { width: 34px; height: 34px; margin: 8px auto; border-radius: 50%; border: 3px solid rgba(154,54,255,.22); border-top-color: #9a36ff; animation: giro .9s linear infinite; }
+@keyframes giro { to { transform: rotate(360deg); } }
+
+.mobile-only { display: none; }
+
+/* El titulo centrado es mas largo que "TIMESHEET": en anchos medianos se
+   compacta para no encimarse con el logotipo ni con la cuenta. */
+@media (max-width: 1380px) {
+  .topbar__title { font-size: 1.05rem; letter-spacing: .12em; }
+}
+@media (max-width: 1180px) {
+  .topbar__title { display: none; }
+}
+@media (max-width: 1100px) {
+  .news-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 1024px) {
+  :root { --sidebar-width: 0px; }
+  .mobile-only { display: grid; }
+  .app-shell { grid-template-columns: minmax(0, 1fr); }
+  .topbar__inner { padding: 0 14px; }
+  .sidebar { position: fixed; z-index: 90; left: 0; width: min(300px, 86vw); height: calc(100dvh - var(--header-height)); transform: translateX(-105%); box-shadow: 18px 0 42px rgba(4,8,20,.24); transition: transform .22s ease; }
+  .sidebar.open { transform: none; }
+  .main { max-width: none; padding: 24px clamp(18px, 4vw, 34px) 56px; }
+  .section-heading { align-items: stretch; flex-direction: column; gap: 14px; }
+  .section-context { max-width: none; text-align: left; }
+}
+
+@media (max-width: 720px) {
+  .topbar__inner { max-width: 100%; }
+  .brand { flex: 0 1 auto; overflow: hidden; }
+  .account-chip__name { display: none; }
+  .account-chip { max-width: none; }
+}
+
+@media (max-width: 600px) {
+  :root { --header-height: 74px; }
+  .topbar__inner { height: 68px; padding: 0 12px; gap: 8px; }
+  .topbar__actions { gap: 6px; }
+  .brand__logo { width: 136px; height: auto; max-width: 136px; }
+  .icon-button { width: 40px; height: 40px; }
+  .main { padding: 18px 14px 44px; }
+  .section-heading { margin-bottom: 18px; }
+  .section-heading h1 { font-size: clamp(1.85rem, 10vw, 2.45rem); }
+  .panel { padding: 16px; }
+  .panel__head { align-items: center; }
+  .aviso { padding: 16px 16px 18px; font-size: .95rem; }
+  .aviso ul { padding-left: 24px; }
+}
+
+@media (max-width: 560px) {
+  .account-chip__role { display: none; }
+  .account-chip { padding: 5px 9px; }
+}
+
+@media (max-width: 380px) {
+  .brand__logo { width: 112px; }
+  .topbar__inner { padding: 0 10px; gap: 6px; }
+  .topbar__actions { gap: 5px; }
+  .panel__head { flex-direction: column; align-items: stretch; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#040814">
+  <meta name="description" content="Portal interno de CLARILIUM: herramientas del equipo y noticias SAP.">
+  <title>Portal · CLARILIUM</title>
+  <link rel="icon" href="assets/img/favicon-32.png" sizes="32x32">
+  <link rel="stylesheet" href="assets/css/portal-inicio.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Saltar al contenido</a>
+  <div id="demoBanner" class="demo-banner" hidden>MODO DEMO · noticias de ejemplo. La página muestra información real solo publicada en el sitio.</div>
+
+  <header class="topbar">
+    <div class="topbar__inner">
+      <button id="menuToggle" class="icon-button mobile-only" type="button" aria-label="Abrir navegación" aria-controls="sidebar" aria-expanded="false">☰</button>
+      <span class="brand"><img class="brand__logo" src="assets/img/logo-portal.png" alt="CLARILIUM — Ideas claras, soluciones claras"></span>
+      <div class="topbar__title">PORTAL INTERNOS</div>
+      <div class="topbar__actions">
+        <button id="refreshNow" class="icon-button" type="button" aria-label="Actualizar noticias" title="Actualizar noticias">⟳</button>
+        <span id="cuenta" class="account-chip" hidden><span id="cuentaNombre" class="account-chip__name"></span><span id="cuentaRol" class="account-chip__role"></span><button id="salir" class="account-chip__out" type="button">Salir</button></span>
+        <button id="themeToggle" class="icon-button" type="button" aria-label="Cambiar tema">◐</button>
+      </div>
+    </div>
+    <div class="identity-strip" aria-hidden="true"></div>
+  </header>
+
+  <!-- Porton de acceso. Visible desde el HTML: nadie alcanza a ver el portal
+       antes de que portal-auth.js confirme una cuenta @clarilium.com. -->
+  <div id="porton" class="porton" role="dialog" aria-modal="true" aria-labelledby="portonTitulo">
+    <div class="porton__tarjeta">
+      <div class="porton__marca"><img class="porton__logo" src="assets/img/logo-nav-color.png" alt="CLARILIUM"></div>
+      <div class="porton__cuerpo">
+        <h2 id="portonTitulo">Portal internos</h2>
+        <div id="portonGirando" class="girando" role="status" aria-label="Verificando tu sesión"></div>
+        <p id="portonMensaje" hidden>Inicia sesión con tu cuenta de CLARILIUM (@clarilium.com).</p>
+        <button id="entrar" class="porton__btn" type="button" hidden>Iniciar sesión con Microsoft</button>
+        <div id="portonError" class="porton__error" hidden></div>
+        <button id="reintentar" class="porton__btn" type="button" hidden>Reintentar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="principal" class="app-shell" hidden>
+    <aside id="sidebar" class="sidebar" aria-label="Herramientas del portal">
+      <nav>
+        <a class="nav-item" href="/timesheet" data-demo="timesheet.html">Timesheet</a>
+        <a class="nav-item" href="/estimacion" data-demo="portal/estimacion.html">Estimación</a>
+        <a class="nav-item" href="https://clarilium.sharepoint.com/:f:/s/administracion/IgBlRvR2jrkxSZAqaSiHnPTHAXUlkndPP1ClxSDwHdy6ZdU?e=ibvAcQ" target="_blank" rel="noopener noreferrer" title="Abre la carpeta Clientes de SharePoint en una pestaña nueva">Repositorio SharePoint <span aria-hidden="true">↗</span></a>
+      </nav>
+    </aside>
+
+    <main id="main" class="main" tabindex="-1">
+      <div class="section-heading">
+        <div><p class="eyebrow">ACTUALIDAD SAP</p><h1>Noticias</h1></div>
+        <p id="noticiasEstado" class="section-context" role="status">Cargando noticias…</p>
+      </div>
+
+      <!-- Aviso critico: jueves, viernes y los ultimos 3 dias de cada mes. -->
+      <section id="aviso" class="aviso" aria-labelledby="avisoTitulo" hidden>
+        <p id="avisoTitulo" class="aviso__etiqueta">AVISO CRÍTICO</p>
+        <p>Este es un recordatorio de carga de horas. Favor de cargar horas trabajadas en <a class="aviso__sysupport" href="https://sysupport.sy-cloud.com/dxgrow/user/login" target="_blank" rel="noopener noreferrer"><span class="aviso__sy">SY</span><span class="aviso__support">SUPPORT</span></a> y también en herramienta de <a class="aviso__clarilium" href="/timesheet" data-demo="timesheet.html">CLARILIUM</a>.</p>
+        <p>Considera estimar y cargar los siguientes rubros:</p>
+        <ul>
+          <li>Análisis</li>
+          <li>Desarrollo o configuración</li>
+          <li>Pruebas</li>
+          <li>Documentación</li>
+          <li>Control de calidad</li>
+        </ul>
+        <p>¡Saludos!</p>
+        <p class="aviso__firma">Servicio automático CLARILIUM</p>
+      </section>
+
+      <div class="news-grid">
+        <article class="panel news-panel" aria-labelledby="titulo-sapnews">
+          <div class="panel__head">
+            <div><p class="eyebrow">NEWS.SAP.COM</p><h3 id="titulo-sapnews">SAP News Center</h3></div>
+            <a class="button button--outline" href="https://news.sap.com/" target="_blank" rel="noopener noreferrer">Ver sitio <span aria-hidden="true">↗</span></a>
+          </div>
+          <ul id="noticias-sapnews" class="news-list" aria-busy="true"></ul>
+        </article>
+        <article class="panel news-panel" aria-labelledby="titulo-community">
+          <div class="panel__head">
+            <div><p class="eyebrow">COMMUNITY.SAP.COM</p><h3 id="titulo-community">SAP Community · Blogs</h3></div>
+            <a class="button button--outline" href="https://community.sap.com/t5/all-blogs/ct-p/all-blogs" target="_blank" rel="noopener noreferrer">Ver sitio <span aria-hidden="true">↗</span></a>
+          </div>
+          <ul id="noticias-community" class="news-list" aria-busy="true"></ul>
+        </article>
+      </div>
+    </main>
+  </div>
+
+  <script src="assets/js/vendor/msal-browser.min.js" defer></script>
+  <script src="assets/js/portal-auth.js" defer></script>
+  <script src="assets/js/portal.js" defer></script>
+</body>
+</html>
