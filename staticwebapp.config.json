@@ -97,16 +97,13 @@
     },
     {
       "route": "/timesheet",
-      "rewrite": "/timesheet.html",
-      "headers": {
-        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://graph.microsoft.com https://login.microsoftonline.com; frame-src https://login.microsoftonline.com; form-action 'self' https://login.microsoftonline.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
-      }
+      "redirect": "/portal/timesheet",
+      "statusCode": 301
     },
     {
       "route": "/timesheet.html",
-      "headers": {
-        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://graph.microsoft.com https://login.microsoftonline.com; frame-src https://login.microsoftonline.com; form-action 'self' https://login.microsoftonline.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
-      }
+      "redirect": "/portal/timesheet",
+      "statusCode": 301
     },
     {
       "route": "/portal",
@@ -125,6 +122,18 @@
       "route": "/estimacion",
       "redirect": "/portal/estimacion",
       "statusCode": 302
+    },
+    {
+      "route": "/portal/timesheet",
+      "rewrite": "/portal/timesheet.html",
+      "headers": {
+        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://graph.microsoft.com https://login.microsoftonline.com; frame-src 'self' https://login.microsoftonline.com; form-action 'self' https://login.microsoftonline.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
+      }
+    },
+    {
+      "route": "/portal/timesheet.html",
+      "redirect": "/portal/timesheet",
+      "statusCode": 301
     },
     {
       "route": "/portal/estimacion",

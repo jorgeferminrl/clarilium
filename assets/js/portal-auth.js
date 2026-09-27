@@ -31,6 +31,8 @@ const PORTAL = {
 };
 
 const esDemo = () => window.location.protocol === "file:";
+// Texto en el idioma elegido (preferencias.js). Sin ese archivo, en espanol.
+const tx = (es, en) => (window.CLARILIUM ? window.CLARILIUM.t(es, en) : es);
 const $ = id => document.getElementById(id);
 const norm = v => String(v ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
 
@@ -46,7 +48,7 @@ const auth = {
   client: null, account: null,
 
   async init() {
-    if (!window.msal) throw new Error("No se pudo cargar la biblioteca de inicio de sesión de Microsoft. Revisa tu conexión.");
+    if (!window.msal) throw new Error(tx("No se pudo cargar la biblioteca de inicio de sesión de Microsoft. Revisa tu conexión.", "The Microsoft sign-in library could not be loaded. Check your connection."));
     this.client = new msal.PublicClientApplication({
       auth: {
         clientId: PORTAL.graph.clientId,
@@ -89,7 +91,7 @@ const auth = {
     } catch (error) {
       if (!redirigir) throw error;
       await this.client.acquireTokenRedirect(peticion);
-      throw new Error("Renovando la sesión…");
+      throw new Error(tx("Renovando la sesión…", "Renewing your session…"));
     }
   }
 };
@@ -100,10 +102,10 @@ const auth = {
 async function graphGet(url, token) {
   let r;
   try { r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } }); }
-  catch { throw new Error("No se pudo contactar a Microsoft Graph. Revisa tu conexión a internet."); }
-  if (r.status === 401) throw new Error("La sesión caducó. Vuelve a iniciar sesión.");
-  if (r.status === 403) { const e = new Error("Tu cuenta no tiene permiso para esta consulta."); e.status = 403; throw e; }
-  if (!r.ok) throw new Error(`Microsoft Graph respondió HTTP ${r.status}.`);
+  catch { throw new Error(tx("No se pudo contactar a Microsoft Graph. Revisa tu conexión a internet.", "Microsoft Graph could not be reached. Check your internet connection.")); }
+  if (r.status === 401) throw new Error(tx("La sesión caducó. Vuelve a iniciar sesión.", "Your session expired. Please sign in again."));
+  if (r.status === 403) { const e = new Error(tx("Tu cuenta no tiene permiso para esta consulta.", "Your account is not allowed to run this query.")); e.status = 403; throw e; }
+  if (!r.ok) throw new Error(tx(`Microsoft Graph respondió HTTP ${r.status}.`, `Microsoft Graph returned HTTP ${r.status}.`));
   return r.json();
 }
 
@@ -159,15 +161,15 @@ async function iniciarPortal({ alEntrar, alDemo, nombreDemo = "Usuario Demo" }) 
 
   porton({ girando: true });
   const vigilante = setTimeout(() => {
-    if (!$("portonGirando").hidden) porton({ error: "La conexión con Microsoft está tardando más de lo normal. Revisa tu conexión y vuelve a intentar.", reintentar: true });
+    if (!$("portonGirando").hidden) porton({ error: tx("La conexión con Microsoft está tardando más de lo normal. Revisa tu conexión y vuelve a intentar.", "The connection to Microsoft is taking longer than usual. Check your connection and try again."), reintentar: true });
   }, 25000);
   try {
     const entro = await auth.init();
     clearTimeout(vigilante);
     if (!entro) { porton({ entrar: true }); return; }
     if (!auth.cuentaPermitida()) {
-      porton({ error: `El portal es solo para cuentas ${PORTAL.dominio}. Iniciaste sesión con ${auth.account.username}.`, reintentar: true });
-      $("reintentar").textContent = "Entrar con otra cuenta";
+      porton({ error: tx(`El portal es solo para cuentas ${PORTAL.dominio}. Iniciaste sesión con ${auth.account.username}.`, `The portal is only for ${PORTAL.dominio} accounts. You signed in as ${auth.account.username}.`), reintentar: true });
+      $("reintentar").textContent = tx("Entrar con otra cuenta", "Sign in with another account");
       accionReintentar = () => auth.salir();
       return;
     }

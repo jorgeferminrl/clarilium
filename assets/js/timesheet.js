@@ -65,6 +65,13 @@ const APP = {
 
 function isDemo() { return window.location.protocol === "file:"; }
 
+// Idioma y tema: los maneja preferencias.js, comun a todo el sitio (mismas
+// claves que www.clarilium.com). L("español", "English") elige el texto.
+const L = (es, en) => (window.CLARILIUM ? window.CLARILIUM.t(es, en) : es);
+const LOC = () => (window.CLARILIUM ? window.CLARILIUM.locale() : "es-MX");
+const SIN_CLIENTE = () => L(SIN_CLIENTE(), "No client");
+const SIN_CONSULTOR = () => L(SIN_CONSULTOR(), "No consultant");
+
 // Secciones que solo puede ver un administrador. Las tarifas viven dentro de
 // estas dos vistas, asi que ocultarlas tambien oculta las tarifas.
 const SECCIONES_ADMIN = ["clientBilling", "collabBilling"];
@@ -116,13 +123,13 @@ class GraphDataProvider extends DataProvider {
     try {
       response = await fetch(url, { headers: { Authorization: `Bearer ${this.token}`, Accept: "application/json" } });
     } catch {
-      throw new Error("No se pudo contactar a Microsoft Graph. Revisa tu conexión a internet.");
+      throw new Error(L("No se pudo contactar a Microsoft Graph. Revisa tu conexión a internet.", "Microsoft Graph could not be reached. Check your internet connection."));
     }
-    if (response.status === 401) throw new Error("La sesión caducó. Vuelve a iniciar sesión.");
-    if (response.status === 403) throw new Error("Tu cuenta no tiene permiso para leer el sitio de SharePoint “timesheet”.");
-    if (response.status === 404) throw new Error("No se encontró el sitio o la lista en SharePoint. Verifica que el sitio timesheet y sus listas existan.");
-    if (response.status === 429) throw new Error("SharePoint limitó temporalmente las consultas. Espera un momento y vuelve a actualizar.");
-    if (!response.ok) throw new Error(`Microsoft Graph respondió HTTP ${response.status}.`);
+    if (response.status === 401) throw new Error(L("La sesión caducó. Vuelve a iniciar sesión.", "Your session expired. Please sign in again."));
+    if (response.status === 403) throw new Error(L("Tu cuenta no tiene permiso para leer el sitio de SharePoint “timesheet”.", "Your account is not allowed to read the “timesheet” SharePoint site."));
+    if (response.status === 404) throw new Error(L("No se encontró el sitio o la lista en SharePoint. Verifica que el sitio timesheet y sus listas existan.", "The SharePoint site or list was not found. Check that the timesheet site and its lists exist."));
+    if (response.status === 429) throw new Error(L("SharePoint limitó temporalmente las consultas. Espera un momento y vuelve a actualizar.", "SharePoint is temporarily throttling requests. Wait a moment and refresh again."));
+    if (!response.ok) throw new Error(L(`Microsoft Graph respondió HTTP ${response.status}.`, `Microsoft Graph returned HTTP ${response.status}.`));
     return response.json();
   }
 
@@ -140,7 +147,7 @@ class GraphDataProvider extends DataProvider {
 
   async siteId() {
     const site = await this.get(`${APP.graph.base}/sites/${APP.graph.hostname}:${APP.graph.sitePath}`);
-    if (!site.id) throw new Error(`No se pudo resolver el sitio ${APP.graph.sitePath} en SharePoint.`);
+    if (!site.id) throw new Error(L(`No se pudo resolver el sitio ${APP.graph.sitePath} en SharePoint.`, `The ${APP.graph.sitePath} site could not be resolved in SharePoint.`));
     return site.id;
   }
 
@@ -157,7 +164,7 @@ class GraphDataProvider extends DataProvider {
 
   requireList(byName, wanted) {
     const list = byName.get(norm(wanted));
-    if (!list) throw new Error(`Falta la lista “${wanted}” en el sitio de SharePoint.`);
+    if (!list) throw new Error(L(`Falta la lista “${wanted}” en el sitio de SharePoint.`, `The “${wanted}” list is missing from the SharePoint site.`));
     return list;
   }
 
@@ -189,7 +196,7 @@ class GraphDataProvider extends DataProvider {
     const wanted = APP.graph.lists[listKey];
     const vacio = { valores: [], porId: new Map() };
     const list = byName.get(norm(wanted));
-    if (!list) { warnings.push(`Falta la lista de catálogo “${wanted}”.`); return vacio; }
+    if (!list) { warnings.push(L(`Falta la lista de catálogo “${wanted}”.`, `The “${wanted}” catalog list is missing.`)); return vacio; }
     const map = await this.columnMap(siteId, list.id);
     const items = await this.itemFields(siteId, list.id);
     for (const candidate of APP.catalogColumns[listKey]) {
@@ -202,12 +209,12 @@ class GraphDataProvider extends DataProvider {
       });
       if (porId.size) {
         if (norm(candidate) !== norm(APP.catalogColumns[listKey][0])) {
-          warnings.push(`En “${wanted}” se usó la columna “${candidate}” para los nombres.`);
+          warnings.push(L(`En “${wanted}” se usó la columna “${candidate}” para los nombres.`, `In “${wanted}” the “${candidate}” column was used for names.`));
         }
         return { valores: unique([...porId.values()]).sort((a, b) => a.localeCompare(b, "es")), porId };
       }
     }
-    warnings.push(`No se encontró una columna de nombre utilizable en “${wanted}”.`);
+    warnings.push(L(`No se encontró una columna de nombre utilizable en “${wanted}”.`, `No usable name column was found in “${wanted}”.`));
     return vacio;
   }
 
@@ -235,7 +242,7 @@ class GraphDataProvider extends DataProvider {
       .filter(([, visible]) => !map.has(norm(visible)))
       .map(([, visible]) => visible);
     if (faltantes.length) {
-      throw new Error(`Faltan columnas en la lista Timesheet: ${faltantes.join(", ")}.`);
+      throw new Error(L(`Faltan columnas en la lista Timesheet: ${faltantes.join(", ")}.`, `Columns missing from the Timesheet list: ${faltantes.join(", ")}.`));
     }
 
     const items = await this.itemFields(siteId, timesheet.id);
@@ -280,7 +287,7 @@ class GraphDataProvider extends DataProvider {
       };
     });
 
-    if (!rows.length) warnings.push("La lista Timesheet no tiene registros todavía.");
+    if (!rows.length) warnings.push(L("La lista Timesheet no tiene registros todavía.", "The Timesheet list has no records yet."));
 
     // Diagnostico: se guarda la forma cruda de los primeros elementos, que es
     // lo unico que permite ver como entrega Graph cada columna.
@@ -306,7 +313,7 @@ class GraphDataProvider extends DataProvider {
         (row._horasDeCorreo && row._horasDeCorreo === miCorreo) ||
         (Boolean(row._horasDe) && norm(row._horasDe) === miNombre));
       if (rows.length && !visibles.length) {
-        warnings.push(`No se encontraron horas capturadas a tu nombre (“${state.me?.displayName || "sin nombre"}”).`);
+        warnings.push(L(`No se encontraron horas capturadas a tu nombre (“${state.me?.displayName || "sin nombre"}”).`, `No hours were found under your name (“${state.me?.displayName || "no name"}”).`));
       }
       // Para el consultor, cada hora va a su propio nombre ("Horas de"). La regla
       // "Asignado a" es para el reporte al cliente, que solo ve el administrador;
@@ -356,7 +363,7 @@ class DemoDataProvider extends DataProvider {
           "Requerimiento": String(4100 + azar(90)),
           "Tipo de actividad": activities[azar(activities.length)],
           "Desarrollador": otro || quien,
-          "Nota": "Registro de ejemplo, no corresponde a datos reales.",
+          "Nota": L("Registro de ejemplo, no corresponde a datos reales.", "Sample record, not real data."),
           "Comentarios adicionales (uso interno)": "",
           _horasDe: quien,
           _asignadoA: otro,
@@ -366,8 +373,8 @@ class DemoDataProvider extends DataProvider {
     }
     return {
       rows, clients, developers: consultants,
-      warnings: ["Modo demo: la información es inventada y no proviene de SharePoint."],
-      sourceName: "Datos de ejemplo (modo demo)"
+      warnings: [L("Modo demo: la información es inventada y no proviene de SharePoint.", "Demo mode: the information is made up and does not come from SharePoint.")],
+      sourceName: L("Datos de ejemplo (modo demo)", "Sample data (demo mode)")
     };
   }
 }
@@ -379,7 +386,7 @@ const auth = {
   client: null, account: null,
 
   async init() {
-    if (!window.msal) throw new Error("No se pudo cargar la biblioteca de inicio de sesión de Microsoft. Revisa tu conexión.");
+    if (!window.msal) throw new Error(L("No se pudo cargar la biblioteca de inicio de sesión de Microsoft. Revisa tu conexión.", "The Microsoft sign-in library could not be loaded. Check your connection."));
     this.client = new msal.PublicClientApplication({
       auth: {
         clientId: APP.graph.clientId,
@@ -433,7 +440,7 @@ const auth = {
       return (await this.client.acquireTokenSilent(peticion)).accessToken;
     } catch {
       await this.client.acquireTokenRedirect(peticion);
-      throw new Error("Renovando la sesión…");
+      throw new Error(L("Renovando la sesión…", "Renewing your session…"));
     }
   }
 };
@@ -458,12 +465,12 @@ function setGateChecking(activo) {
 
 // Version de los tres archivos. Se inyecta al publicar en el HTML, el CSS y
 // el JS a la vez; si no coinciden, la pagina lo dice en vez de fallar callada.
-const VERSION_TIMESHEET = "2026.09.26-1";
+const VERSION_TIMESHEET = "2026.09.27-1";
 
 function versionesPublicadas() {
-  const html = document.querySelector('meta[name="timesheet-version"]')?.content || "sin versión";
+  const html = document.querySelector('meta[name="timesheet-version"]')?.content || L("sin versión", "no version");
   const css = getComputedStyle(document.documentElement)
-    .getPropertyValue("--timesheet-version").trim().replace(/["']/g, "") || "sin versión";
+    .getPropertyValue("--timesheet-version").trim().replace(/["']/g, "") || L("sin versión", "no version");
   return { html, css, js: VERSION_TIMESHEET };
 }
 
@@ -482,8 +489,9 @@ function renderAccountChip() {
   const chip = document.getElementById("accountChip");
   if (!auth.account) { chip.hidden = true; return; }
   document.getElementById("accountName").textContent = auth.account.name || auth.account.username || "";
-  document.getElementById("accountRole").textContent = state.isAdmin ? "Administrador" : "Consultor";
-  chip.title = `${auth.account.name || auth.account.username || ""} · ${state.isAdmin ? "Administrador" : "Consultor"}`;
+  const rol = state.isAdmin ? L("Administrador", "Administrator") : L("Consultor", "Consultant");
+  document.getElementById("accountRole").textContent = rol;
+  chip.title = `${auth.account.name || auth.account.username || ""} · ${rol}`;
   chip.hidden = false;
 }
 
@@ -512,7 +520,6 @@ function readStorage() {
 function saveStorage() {
   try {
     localStorage.setItem(APP.storageKey, JSON.stringify({
-      theme: document.body.classList.contains("dark") ? "dark" : "light",
       clientRates: state.clientRates, collabRates: state.collabRates,
       manualAssignments: state.manualAssignments, collaboratorSource: state.collaboratorSource
     }));
@@ -526,11 +533,11 @@ function unique(values) { return [...new Set(values.filter(v => v !== "" && v !=
 function sum(records) { return records.reduce((total, row) => total + row.hours, 0); }
 function fmtHours(value) { const n = Number(value) || 0; return Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, ""); }
 function toISO(date) { return date ? date.toISOString().slice(0, 10) : ""; }
-function formatDate(date) { return date ? new Intl.DateTimeFormat("es-MX", { day:"2-digit", month:"2-digit", year:"numeric", timeZone:"UTC" }).format(date) : "—"; }
+function formatDate(date) { return date ? new Intl.DateTimeFormat(LOC(), { day:"2-digit", month:"2-digit", year:"numeric", timeZone:"UTC" }).format(date) : "—"; }
 function monthKey(date) { return date ? `${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,"0")}` : ""; }
 function currentMonthKey() { const now=new Date(); return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`; }
-function monthLabel(key) { if (!key) return "Todos los periodos"; const [y,m] = key.split("-").map(Number); return new Intl.DateTimeFormat("es-MX", { month:"long", year:"numeric", timeZone:"UTC" }).format(new Date(Date.UTC(y,m-1,1))).replace(/^./, c => c.toUpperCase()); }
-function money(minor, currency="MXN") { return new Intl.NumberFormat("es-MX", { style:"currency", currency, minimumFractionDigits:2, maximumFractionDigits:2 }).format((minor || 0) / 100); }
+function monthLabel(key) { if (!key) return L("Todos los periodos", "All periods"); const [y,m] = key.split("-").map(Number); return new Intl.DateTimeFormat(LOC(), { month:"long", year:"numeric", timeZone:"UTC" }).format(new Date(Date.UTC(y,m-1,1))).replace(/^./, c => c.toUpperCase()); }
+function money(minor, currency="MXN") { return new Intl.NumberFormat(LOC(), { style:"currency", currency, minimumFractionDigits:2, maximumFractionDigits:2 }).format((minor || 0) / 100); }
 function toMinor(amount) { return Math.round((Number(amount) || 0) * 100); }
 function parseDate(value) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
@@ -557,8 +564,8 @@ function normalizePayload(payload) {
     const rawHours = typeof row["Horas"] === "string" ? row["Horas"].replace(",", ".") : row["Horas"];
     const hours = Number(rawHours);
     const reasons = [];
-    if (!date) reasons.push("Fecha no interpretable");
-    if (!Number.isFinite(hours) || hours <= 0) reasons.push("Horas vacías, no numéricas o no positivas");
+    if (!date) reasons.push(L("Fecha no interpretable", "Date could not be read"));
+    if (!Number.isFinite(hours) || hours <= 0) reasons.push(L("Horas vacías, no numéricas o no positivas", "Hours empty, not numeric or not positive"));
     const record = {
       id: row._itemId ? `sp-${row._itemId}` : `row-${index + 2}`, rowNumber: index + 2, timestamp: row["Marca temporal"],
       client: clean(row["Cliente"]), date, hours, requirement: clean(row["Requerimiento"]),
@@ -621,7 +628,7 @@ function restoreUiState(uiState) {
   });
 }
 
-function optionList(values, selected="", allLabel="Todos") {
+function optionList(values, selected="", allLabel=L("Todos", "All")) {
   return `<option value="">${esc(allLabel)}</option>` + values.map(v => `<option value="${esc(v)}"${v === selected ? " selected" : ""}>${esc(v)}</option>`).join("");
 }
 
@@ -633,7 +640,7 @@ function populateControls() {
   const requirements = unique(state.records.map(r => r.requirement)).sort((a,b)=>a.localeCompare(b,"es",{numeric:true}));
   const activities = unique(state.records.map(r => r.activity)).sort((a,b)=>a.localeCompare(b,"es"));
   const periodControl=document.getElementById("filterPeriod");
-  periodControl.innerHTML = `<option value="">Todos los periodos</option>` + periods.map(k => `<option value="${k}">${esc(monthLabel(k))}</option>`).join("");
+  periodControl.innerHTML = `<option value="">${esc(L("Todos los periodos", "All periods"))}</option>` + periods.map(k => `<option value="${k}">${esc(monthLabel(k))}</option>`).join("");
   periodControl.value=defaultPeriod;
   document.getElementById("filterClient").innerHTML = optionList(clients);
   document.getElementById("filterConsultant").innerHTML = optionList(consultants);
@@ -706,17 +713,17 @@ function updateAll() {
 function renderSummary(rows) {
   const total = sum(rows);
   const kpis = [
-    ["Total de horas", fmtHours(total), `${rows.length} registros válidos`, "approval", "Ir al reporte mensual de horas"],
-    ["Clientes con actividad", unique(rows.map(r=>r.client)).length, "con horas en el periodo", "clients", "Ir a horas por cliente"],
-    ["Consultores con actividad", unique(rows.map(r=>r.consultant)).length, "participantes", "consultants", "Ir a horas por consultor"]
+    [L("Total de horas", "Total hours"), fmtHours(total), L(`${rows.length} registros válidos`, `${rows.length} valid records`), "approval", L("Ir al reporte mensual de horas", "Go to the monthly hours report")],
+    [L("Clientes con actividad", "Clients with activity"), unique(rows.map(r=>r.client)).length, L("con horas en el periodo", "with hours in the period"), "clients", L("Ir a horas por cliente", "Go to hours by client")],
+    [L("Consultores con actividad", "Consultants with activity"), unique(rows.map(r=>r.consultant)).length, L("participantes", "participants"), "consultants", L("Ir a horas por consultor", "Go to hours by consultant")]
   ];
   document.getElementById("kpiGrid").innerHTML = kpis.map(([label,value,foot,view,ariaLabel])=>`<button type="button" class="kpi kpi--link" data-kpi-view="${view}" aria-label="${esc(ariaLabel)}"><span class="kpi__label">${esc(label)}</span><strong class="kpi__value">${esc(value)}</strong><span class="kpi__foot">${esc(foot)}</span></button>`).join("");
   const daily = [...groupBy(rows, r=>toISO(r.date))].map(([key,data])=>({key, label:formatDate(data[0].date), value:sum(data)})).sort((a,b)=>a.key.localeCompare(b.key));
   drawChart("trendChart", {
-    type:"line", data:{ labels:daily.map(d=>d.label), datasets:[{label:"Horas",data:daily.map(d=>d.value),borderColor:APP.colors[0],backgroundColor:"rgba(148,64,255,.14)",fill:true,tension:.28,pointRadius:4,pointHoverRadius:6}]},
-    options:baseChartOptions({ yTitle:"Horas" })
+    type:"line", data:{ labels:daily.map(d=>d.label), datasets:[{label:L("Horas", "Hours"),data:daily.map(d=>d.value),borderColor:APP.colors[0],backgroundColor:"rgba(148,64,255,.14)",fill:true,tension:.28,pointRadius:4,pointHoverRadius:6}]},
+    options:baseChartOptions({ yTitle:L("Horas", "Hours") })
   }, daily.map(d=>[d.label,d.value]));
-  const activities = [...groupBy(rows,r=>r.activity || "Sin actividad")].map(([label,data])=>({label,value:sum(data)})).sort((a,b)=>b.value-a.value);
+  const activities = [...groupBy(rows,r=>r.activity || L("Sin actividad", "No activity"))].map(([label,data])=>({label,value:sum(data)})).sort((a,b)=>b.value-a.value);
   drawChart("activityChart", { type:"doughnut", data:{labels:activities.map(d=>d.label),datasets:[{data:activities.map(d=>d.value),backgroundColor:activities.map((_,i)=>APP.colors[i%APP.colors.length]),borderWidth:0}]}, options:{responsive:true,maintainAspectRatio:false,animation:false,cutout:"63%",plugins:chartPlugins()} }, activities.map(d=>[d.label,d.value]));
 }
 
@@ -735,7 +742,7 @@ function drawChart(id, config, fallbackData=[]) {
   const fallback = document.querySelector(`[data-for="${id}"]`);
   if (!window.Chart || !fallbackData.length) {
     canvas.style.display = "none"; fallback.style.display = "block";
-    fallback.innerHTML = fallbackData.length ? fallbackBars(fallbackData, id) : `<p class="empty-cell">No hay datos para mostrar.</p>`;
+    fallback.innerHTML = fallbackData.length ? fallbackBars(fallbackData, id) : `<p class="empty-cell">${esc(L("No hay datos para mostrar.", "No data to display."))}</p>`;
     return;
   }
   canvas.style.display = "block"; fallback.style.display = "none";
@@ -754,12 +761,12 @@ function fallbackBars(data, chartId="") {
 }
 
 function renderClients(rows) {
-  const items = [...groupBy(rows,r=>r.client || "Sin cliente")].map(([client,data])=>({
+  const items = [...groupBy(rows,r=>r.client || SIN_CLIENTE())].map(([client,data])=>({
     client, hours:sum(data)
   })).sort((a,b)=>b.hours-a.hours);
   const wrap = document.getElementById("clientChart").parentElement;
   wrap.style.setProperty("--bars", items.length || 4);
-  drawChart("clientChart", { type:"bar", data:{labels:items.map(i=>i.client),datasets:[{label:"Horas",data:items.map(i=>i.hours),backgroundColor:APP.colors[0],hoverBackgroundColor:APP.colors[2],borderRadius:5,barThickness:24}]}, options:{...baseChartOptions(),indexAxis:"y",interaction:{mode:"nearest",axis:"y",intersect:true},scales:{x:{beginAtZero:true,grid:{color:"rgba(255,255,255,.08)"},ticks:{color:"#D1D2D4"}},y:{grid:{display:false},ticks:{color:"#FFFFFF",font:{weight:"700"}}}},plugins:{...chartPlugins(),legend:{display:false},tooltip:{mode:"nearest",axis:"y",intersect:true,callbacks:{title:contexts=>contexts[0]?.label||"",label:context=>`Horas: ${fmtHours(context.raw)} h`}}}} }, items.map(i=>[i.client,i.hours]));
+  drawChart("clientChart", { type:"bar", data:{labels:items.map(i=>i.client),datasets:[{label:L("Horas", "Hours"),data:items.map(i=>i.hours),backgroundColor:APP.colors[0],hoverBackgroundColor:APP.colors[2],borderRadius:5,barThickness:24}]}, options:{...baseChartOptions(),indexAxis:"y",interaction:{mode:"nearest",axis:"y",intersect:true},scales:{x:{beginAtZero:true,grid:{color:"rgba(255,255,255,.08)"},ticks:{color:"#D1D2D4"}},y:{grid:{display:false},ticks:{color:"#FFFFFF",font:{weight:"700"}}}},plugins:{...chartPlugins(),legend:{display:false},tooltip:{mode:"nearest",axis:"y",intersect:true,callbacks:{title:contexts=>contexts[0]?.label||"",label:context=>`${L("Horas", "Hours")}: ${fmtHours(context.raw)} h`}}}} }, items.map(i=>[i.client,i.hours]));
   if (state.selectedClient && items.some(item=>item.client===state.selectedClient)) renderClientDetail(state.selectedClient,rows);
   else hideClientDetail();
 }
@@ -783,16 +790,16 @@ function showClientDetail(client,rows=applyFilters(state.records)) {
   state.selectedClient=client;
   renderClientDetail(client,rows);
   requestAnimationFrame(()=>document.getElementById("clientDetailPanel").scrollIntoView({behavior:"smooth",block:"start"}));
-  toast(`Detalle de ${client}: ${rows.filter(r=>(r.client||"Sin cliente")===client).length} registros.`);
+  toast(L(`Detalle de ${client}: ${rows.filter(r=>(r.client||SIN_CLIENTE())===client).length} registros.`, `${client} detail: ${rows.filter(r=>(r.client||SIN_CLIENTE())===client).length} records.`));
 }
 
 function renderClientDetail(client,rows) {
-  const detail=rows.filter(r=>(r.client||"Sin cliente")===client).sort((a,b)=>a.date-b.date||a.requirement.localeCompare(b.requirement,"es",{numeric:true})||a.consultant.localeCompare(b.consultant,"es"));
+  const detail=rows.filter(r=>(r.client||SIN_CLIENTE())===client).sort((a,b)=>a.date-b.date||a.requirement.localeCompare(b.requirement,"es",{numeric:true})||a.consultant.localeCompare(b.consultant,"es"));
   if(!detail.length)return hideClientDetail();
   const panel=document.getElementById("clientDetailPanel");
-  document.getElementById("clientDetailTitle").textContent=`Reporte de horas — ${client}`;
-  document.getElementById("clientDetailMeta").textContent=`${detail.length} registros · ${fmtHours(sum(detail))} h`;
-  document.getElementById("clientDetailBody").innerHTML=detail.map(r=>`<tr><td><b>${esc(r.client||"Sin cliente")}</b></td><td>${esc(r.requirement)}</td><td>${esc(r.consultant)}</td><td>${formatDate(r.date)}</td><td class="num">${fmtHours(r.hours)}</td><td>${esc(r.activity)}</td><td>${esc(r.note)}</td></tr>`).join("");
+  document.getElementById("clientDetailTitle").textContent=L(`Reporte de horas — ${client}`, `Hours report — ${client}`);
+  document.getElementById("clientDetailMeta").textContent=L(`${detail.length} registros · ${fmtHours(sum(detail))} h`, `${detail.length} records · ${fmtHours(sum(detail))} h`);
+  document.getElementById("clientDetailBody").innerHTML=detail.map(r=>`<tr><td><b>${esc(r.client||SIN_CLIENTE())}</b></td><td>${esc(r.requirement)}</td><td>${esc(r.consultant)}</td><td>${formatDate(r.date)}</td><td class="num">${fmtHours(r.hours)}</td><td>${esc(r.activity)}</td><td>${esc(r.note)}</td></tr>`).join("");
   panel.hidden=false;
 }
 
@@ -837,9 +844,9 @@ function renderConsultantFocus(rows) {
   const mosaicos = document.getElementById("consultantFocusKpis");
   const opciones = focusConsultantOptions();
   if (!opciones.length) {
-    selector.innerHTML = `<option value="">Sin consultores</option>`;
+    selector.innerHTML = `<option value="">${esc(L("Sin consultores", "No consultants"))}</option>`;
     selector.disabled = true;
-    mosaicos.innerHTML = `<p class="empty-cell">No hay horas capturadas todavía.</p>`;
+    mosaicos.innerHTML = `<p class="empty-cell">${esc(L("No hay horas capturadas todavía.", "No hours logged yet."))}</p>`;
     return;
   }
   selector.disabled = false;
@@ -855,11 +862,11 @@ function renderConsultantFocus(rows) {
   selector.innerHTML = opciones.map(nombre => `<option value="${esc(nombre)}"${nombre === state.focusConsultant ? " selected" : ""}>${esc(nombre)}</option>`).join("");
   selector.value = state.focusConsultant;
   const t = focusTotals(rows, state.focusConsultant);
-  const registros = n => `${n} ${n === 1 ? "registro" : "registros"}`;
+  const registros = n => `${n} ${n === 1 ? L("registro", "record") : L("registros", "records")}`;
   const kpis = [
-    ["Total de horas trabajadas", fmtHours(t.propias + t.ajenas), `${registros(t.nPropias + t.nAjenas)} · según los filtros`],
-    ["Horas trabajadas asignadas a mí", fmtHours(t.propias), `${registros(t.nPropias)} a su propio nombre`],
-    ["Horas trabajadas asignadas a otros", fmtHours(t.ajenas), `${registros(t.nAjenas)} reportados a otro consultor`]
+    [L("Total de horas trabajadas", "Total hours worked"), fmtHours(t.propias + t.ajenas), L(`${registros(t.nPropias + t.nAjenas)} · según los filtros`, `${registros(t.nPropias + t.nAjenas)} · per the filters`)],
+    [L("Horas trabajadas asignadas a mí", "Hours worked assigned to me"), fmtHours(t.propias), L(`${registros(t.nPropias)} a su propio nombre`, `${registros(t.nPropias)} under their own name`)],
+    [L("Horas trabajadas asignadas a otros", "Hours worked assigned to others"), fmtHours(t.ajenas), L(`${registros(t.nAjenas)} reportados a otro consultor`, `${registros(t.nAjenas)} reported under another consultant`)]
   ];
   mosaicos.innerHTML = kpis.map(([label, value, foot]) => `<div class="kpi"><span class="kpi__label">${esc(label)}</span><strong class="kpi__value">${esc(value)}</strong><span class="kpi__foot">${esc(foot)}</span></div>`).join("");
 }
@@ -867,24 +874,24 @@ function renderConsultantFocus(rows) {
 function renderConsultants(rows) {
   renderConsultantFocus(rows);
   const total = sum(rows);
-  const items = [...groupBy(rows,r=>r.consultant || "Sin consultor")].map(([name,data])=>{
+  const items = [...groupBy(rows,r=>r.consultant || SIN_CONSULTOR())].map(([name,data])=>{
     const capacity = capacityFor(name, state.filters.period || monthKey(data[0]?.date));
     const hours = sum(data); return { name, hours, capacity, available: capacity == null ? null : capacity-hours,
       clients:unique(data.map(r=>r.client)).length, requirements:unique(data.map(r=>r.requirement)).length, days:unique(data.map(r=>toISO(r.date))).length };
   }).sort((a,b)=>b.hours-a.hours);
   drawChart("consultantChart", {
     type:"bar",
-    data:{labels:items.map(i=>i.name),datasets:[{label:"Horas",data:items.map(i=>i.hours),backgroundColor:APP.colors[0],hoverBackgroundColor:APP.colors[2],borderRadius:5}]},
+    data:{labels:items.map(i=>i.name),datasets:[{label:L("Horas", "Hours"),data:items.map(i=>i.hours),backgroundColor:APP.colors[0],hoverBackgroundColor:APP.colors[2],borderRadius:5}]},
     options:{
       ...baseChartOptions(),
       interaction:{mode:"nearest",axis:"x",intersect:true},
-      plugins:{...chartPlugins(),legend:{display:false},tooltip:{mode:"nearest",axis:"x",intersect:true,callbacks:{title:contexts=>contexts[0]?.label||"",label:context=>`Horas: ${fmtHours(context.raw)} h`}}}
+      plugins:{...chartPlugins(),legend:{display:false},tooltip:{mode:"nearest",axis:"x",intersect:true,callbacks:{title:contexts=>contexts[0]?.label||"",label:context=>`${L("Horas", "Hours")}: ${fmtHours(context.raw)} h`}}}
     }
   },items.map(i=>[i.name,i.hours]));
-  const clients = unique(rows.map(r=>r.client||"Sin cliente")).sort();
-  const byConsultant = groupBy(rows,r=>r.consultant||"Sin consultor");
-  const datasets = clients.map((client,i)=>({label:client,backgroundColor:APP.colors[i%APP.colors.length],data:items.map(item=>sum((byConsultant.get(item.name)||[]).filter(r=>(r.client||"Sin cliente")===client))),borderWidth:0}));
-  const mixFallback=items.flatMap(item=>clients.map(client=>{const hours=sum((byConsultant.get(item.name)||[]).filter(r=>(r.client||"Sin cliente")===client));return hours?[`${item.name} · ${client}`,hours,{consultant:item.name,client}]:null;}).filter(Boolean));
+  const clients = unique(rows.map(r=>r.client||SIN_CLIENTE())).sort();
+  const byConsultant = groupBy(rows,r=>r.consultant||SIN_CONSULTOR());
+  const datasets = clients.map((client,i)=>({label:client,backgroundColor:APP.colors[i%APP.colors.length],data:items.map(item=>sum((byConsultant.get(item.name)||[]).filter(r=>(r.client||SIN_CLIENTE())===client))),borderWidth:0}));
+  const mixFallback=items.flatMap(item=>clients.map(client=>{const hours=sum((byConsultant.get(item.name)||[]).filter(r=>(r.client||SIN_CLIENTE())===client));return hours?[`${item.name} · ${client}`,hours,{consultant:item.name,client}]:null;}).filter(Boolean));
   drawChart("consultantMixChart", {
     type:"bar",
     data:{labels:items.map(i=>i.name),datasets},
@@ -892,13 +899,13 @@ function renderConsultants(rows) {
       ...baseChartOptions(),
       interaction:{mode:"nearest",axis:"xy",intersect:true},
       scales:{x:{stacked:true,grid:{display:false},ticks:{color:chartTextColor()}},y:{stacked:true,beginAtZero:true,grid:{color:chartGridColor()},ticks:{color:chartTextColor()}}},
-      plugins:{...chartPlugins(),legend:{...chartPlugins().legend,onClick:(_event,legendItem,legend)=>selectConsultantClientFromLegend(legendItem,legend.chart)},tooltip:{mode:"nearest",axis:"xy",intersect:true,callbacks:{title:contexts=>{const context=contexts[0];return context?`${context.label} — ${context.dataset.label}`:"";},label:context=>`Horas: ${fmtHours(context.raw)} h`}}}
+      plugins:{...chartPlugins(),legend:{...chartPlugins().legend,onClick:(_event,legendItem,legend)=>selectConsultantClientFromLegend(legendItem,legend.chart)},tooltip:{mode:"nearest",axis:"xy",intersect:true,callbacks:{title:contexts=>{const context=contexts[0];return context?`${context.label} — ${context.dataset.label}`:"";},label:context=>`${L("Horas", "Hours")}: ${fmtHours(context.raw)} h`}}}
     }
   },mixFallback);
-  document.getElementById("consultantTableBody").innerHTML = items.length ? items.map(i=>`<tr><td><b>${esc(i.name)}</b></td><td class="num">${fmtHours(i.hours)}</td><td class="num">${total?(i.hours/total*100).toFixed(1):"0.0"}%</td><td class="num">${i.clients}</td><td class="num">${i.requirements}</td><td class="num">${i.days}</td><td class="num">${i.capacity==null?"Pendiente":fmtHours(i.capacity)}</td><td class="num">${i.available==null?"—":fmtHours(i.available)}</td><td>${i.capacity?`<span class="progress-line"><span><i style="width:${Math.min(100,i.hours/i.capacity*100)}%"></i></span><b>${(i.hours/i.capacity*100).toFixed(1)}%</b></span>`:"Sin configurar"}</td></tr>`).join("") : emptyRow(9);
+  document.getElementById("consultantTableBody").innerHTML = items.length ? items.map(i=>`<tr><td><b>${esc(i.name)}</b></td><td class="num">${fmtHours(i.hours)}</td><td class="num">${total?(i.hours/total*100).toFixed(1):"0.0"}%</td><td class="num">${i.clients}</td><td class="num">${i.requirements}</td><td class="num">${i.days}</td><td class="num">${i.capacity==null?L("Pendiente", "Pending"):fmtHours(i.capacity)}</td><td class="num">${i.available==null?"—":fmtHours(i.available)}</td><td>${i.capacity?`<span class="progress-line"><span><i style="width:${Math.min(100,i.hours/i.capacity*100)}%"></i></span><b>${(i.hours/i.capacity*100).toFixed(1)}%</b></span>`:L("Sin configurar", "Not set")}</td></tr>`).join("") : emptyRow(9);
   if(state.selectedConsultant&&items.some(item=>item.name===state.selectedConsultant)){
     const selectedRows=byConsultant.get(state.selectedConsultant)||[];
-    if(state.selectedConsultantClient&&!selectedRows.some(r=>(r.client||"Sin cliente")===state.selectedConsultantClient))state.selectedConsultantClient="";
+    if(state.selectedConsultantClient&&!selectedRows.some(r=>(r.client||SIN_CLIENTE())===state.selectedConsultantClient))state.selectedConsultantClient="";
     renderConsultantDetail(state.selectedConsultant,state.selectedConsultantClient,rows);
   }else hideConsultantDetail();
 }
@@ -908,22 +915,22 @@ function consultantElementFromPointer(event,chart,axis="xy") {
 }
 
 function showConsultantDetail(consultant,client="",rows=applyFilters(state.records)) {
-  const matches=rows.filter(r=>(r.consultant||"Sin consultor")===consultant&&(!client||(r.client||"Sin cliente")===client));
-  if(!matches.length){toast(`No hay horas de ${consultant}${client?` para ${client}`:""} con los filtros actuales.`);return;}
+  const matches=rows.filter(r=>(r.consultant||SIN_CONSULTOR())===consultant&&(!client||(r.client||SIN_CLIENTE())===client));
+  if(!matches.length){toast(L(`No hay horas de ${consultant}${client?` para ${client}`:""} con los filtros actuales.`, `No hours for ${consultant}${client?` for ${client}`:""} with the current filters.`));return;}
   state.selectedConsultant=consultant;
   state.selectedConsultantClient=client;
   renderConsultantDetail(consultant,client,rows);
   requestAnimationFrame(()=>document.getElementById("consultantDetailPanel").scrollIntoView({behavior:"smooth",block:"start"}));
-  toast(`Detalle de ${consultant}${client?` · ${client}`:""}: ${matches.length} registros.`);
+  toast(L(`Detalle de ${consultant}${client?` · ${client}`:""}: ${matches.length} registros.`, `${consultant}${client?` · ${client}`:""} detail: ${matches.length} records.`));
 }
 
 function renderConsultantDetail(consultant,client,rows) {
-  const detail=rows.filter(r=>(r.consultant||"Sin consultor")===consultant&&(!client||(r.client||"Sin cliente")===client)).sort((a,b)=>a.date-b.date||a.client.localeCompare(b.client,"es")||a.requirement.localeCompare(b.requirement,"es",{numeric:true}));
+  const detail=rows.filter(r=>(r.consultant||SIN_CONSULTOR())===consultant&&(!client||(r.client||SIN_CLIENTE())===client)).sort((a,b)=>a.date-b.date||a.client.localeCompare(b.client,"es")||a.requirement.localeCompare(b.requirement,"es",{numeric:true}));
   if(!detail.length)return hideConsultantDetail();
   const panel=document.getElementById("consultantDetailPanel");
-  document.getElementById("consultantDetailTitle").textContent=client?`Reporte de horas — ${consultant} · ${client}`:`Reporte de horas — ${consultant}`;
-  document.getElementById("consultantDetailMeta").textContent=`${detail.length} registros · ${fmtHours(sum(detail))} h · según los filtros de análisis`;
-  document.getElementById("consultantDetailBody").innerHTML=detail.map(r=>`<tr><td><b>${esc(r.client||"Sin cliente")}</b></td><td>${formatDate(r.date)}</td><td>${esc(r.requirement)}</td><td>${esc(r.consultant||"Sin consultor")}</td><td>${esc(r.activity)}</td><td>${esc(r.note)}</td><td class="num">${fmtHours(r.hours)}</td></tr>`).join("");
+  document.getElementById("consultantDetailTitle").textContent=L("Reporte de horas", "Hours report")+(client?` — ${consultant} · ${client}`:` — ${consultant}`);
+  document.getElementById("consultantDetailMeta").textContent=L(`${detail.length} registros · ${fmtHours(sum(detail))} h · según los filtros de análisis`, `${detail.length} records · ${fmtHours(sum(detail))} h · per the analysis filters`);
+  document.getElementById("consultantDetailBody").innerHTML=detail.map(r=>`<tr><td><b>${esc(r.client||SIN_CLIENTE())}</b></td><td>${formatDate(r.date)}</td><td>${esc(r.requirement)}</td><td>${esc(r.consultant||SIN_CONSULTOR())}</td><td>${esc(r.activity)}</td><td>${esc(r.note)}</td><td class="num">${fmtHours(r.hours)}</td></tr>`).join("");
   panel.hidden=false;
 }
 
@@ -937,7 +944,7 @@ function hideConsultantDetail() {
 
 function selectConsultantClientFromLegend(legendItem,chart) {
   const client=chart?.data?.datasets?.[legendItem.datasetIndex]?.label||"";
-  if(!state.selectedConsultant)return toast("Selecciona primero la barra de un consultor.");
+  if(!state.selectedConsultant)return toast(L("Selecciona primero la barra de un consultor.", "First select a consultant's bar."));
   showConsultantDetail(state.selectedConsultant,client);
 }
 
@@ -953,30 +960,30 @@ function rateAppliesToPeriod(rate, period) {
   return period >= from && period <= to;
 }
 
-function emptyRow(cols) { return `<tr><td colspan="${cols}" class="empty-cell">No hay datos que coincidan con los filtros.</td></tr>`; }
+function emptyRow(cols) { return `<tr><td colspan="${cols}" class="empty-cell">${esc(L("No hay datos que coincidan con los filtros.", "No data matches the filters."))}</td></tr>`; }
 
 function exportRows(rows, format, title, filename) {
-  if (!rows.length) { toast("No hay datos para exportar."); return; }
+  if (!rows.length) { toast(L("No hay datos para exportar.", "There is no data to export.")); return; }
   if (format === "pdf") return exportRowsPdf(rows,title,filename);
   if (format === "xlsx" && window.XLSX) {
-    const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Reporte"); XLSX.writeFile(wb,`${filename}.xlsx`); return;
+    const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,L("Reporte", "Report")); XLSX.writeFile(wb,`${filename}.xlsx`); return;
   }
   const headers = Object.keys(rows[0]);
   const csv = "\ufeff" + [headers,...rows.map(r=>headers.map(h=>r[h]))].map(line=>line.map(csvCell).join(",")).join("\r\n");
   downloadBlob(new Blob([csv],{type:"text/csv;charset=utf-8"}),`${filename}.csv`);
-  if (format === "xlsx") toast("Excel no estaba disponible; se exportó CSV.");
+  if (format === "xlsx") toast(L("Excel no estaba disponible; se exportó CSV.", "Excel was not available; CSV was exported instead."));
 }
 
 function csvCell(v) { const s=String(v??""); return `"${s.replace(/"/g,'""')}"`; }
 function downloadBlob(blob,name) { const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
 
 function exportRowsPdf(rows,title,filename) {
-  if (!window.jspdf?.jsPDF) { toast("La biblioteca PDF no está disponible."); return; }
+  if (!window.jspdf?.jsPDF) { toast(L("La biblioteca PDF no está disponible.", "The PDF library is not available.")); return; }
   const { jsPDF } = window.jspdf; const doc = new jsPDF({orientation:"landscape",unit:"mm",format:"letter"});
-  if (typeof doc.autoTable !== "function") { toast("La extensión de tablas PDF no está disponible."); return; }
+  if (typeof doc.autoTable !== "function") { toast(L("La extensión de tablas PDF no está disponible.", "The PDF table extension is not available.")); return; }
   const headers = Object.keys(rows[0]);
   doc.setFillColor(4,8,20); doc.rect(0,0,280,22,"F"); doc.setTextColor(255,255,255); doc.setFontSize(15); doc.text(title,14,14);
-  doc.autoTable({head:[headers],body:rows.map(r=>headers.map(h=>r[h])),startY:28,theme:"striped",headStyles:{fillColor:[13,23,40],textColor:255},styles:{fontSize:7,cellPadding:2,overflow:"linebreak"},alternateRowStyles:{fillColor:[247,247,248]},margin:{left:10,right:10,bottom:12},rowPageBreak:"avoid",showHead:"everyPage",didDrawPage:({pageNumber})=>{doc.setTextColor(102,112,133);doc.setFontSize(7);doc.text(`Página ${pageNumber}`,270,210,{align:"right"});}});
+  doc.autoTable({head:[headers],body:rows.map(r=>headers.map(h=>r[h])),startY:28,theme:"striped",headStyles:{fillColor:[13,23,40],textColor:255},styles:{fontSize:7,cellPadding:2,overflow:"linebreak"},alternateRowStyles:{fillColor:[247,247,248]},margin:{left:10,right:10,bottom:12},rowPageBreak:"avoid",showHead:"everyPage",didDrawPage:({pageNumber})=>{doc.setTextColor(102,112,133);doc.setFontSize(7);doc.text(`${L("Página", "Page")} ${pageNumber}`,270,210,{align:"right"});}});
   doc.save(`${filename}.pdf`);
 }
 
@@ -987,60 +994,60 @@ function approvalRows() {
 function approvalData(rows=approvalRows()) {
   const sorted=[...rows].sort((a,b)=>(a.client||"").localeCompare(b.client||"","es",{numeric:true})||a.date-b.date||a.requirement.localeCompare(b.requirement,"es",{numeric:true})||a.consultant.localeCompare(b.consultant,"es"));
   return {
-    headers:["Cliente","Fecha","Requerimiento","Consultor","Actividad","Nota","Horas"],
-    rows:sorted.map(r=>[r.client||"Sin cliente",formatDate(r.date),r.requirement,r.consultant,r.activity,r.note||"—",fmtHours(r.hours)]),
+    headers:[L("Cliente","Client"),L("Fecha","Date"),L("Requerimiento","Requirement"),L("Consultor","Consultant"),L("Actividad","Activity"),L("Nota","Note"),L("Horas","Hours")],
+    rows:sorted.map(r=>[r.client||SIN_CLIENTE(),formatDate(r.date),r.requirement,r.consultant,r.activity,r.note||"—",fmtHours(r.hours)]),
     raw:sorted
   };
 }
 
 function approvalGroups(rows=approvalRows()) {
   const data=approvalData(rows);
-  return [...groupBy(data.raw,row=>row.client||"Sin cliente")].map(([client,clientRows])=>({
+  return [...groupBy(data.raw,row=>row.client||SIN_CLIENTE())].map(([client,clientRows])=>({
     client,
     hours:sum(clientRows),
-    rows:clientRows.map(r=>[r.client||"Sin cliente",formatDate(r.date),r.requirement,r.consultant,r.activity,r.note||"—",fmtHours(r.hours)])
+    rows:clientRows.map(r=>[r.client||SIN_CLIENTE(),formatDate(r.date),r.requirement,r.consultant,r.activity,r.note||"—",fmtHours(r.hours)])
   }));
 }
 
 function renderApproval(rows=approvalRows()) {
-  const totalLabel=`${fmtHours(sum(rows))} horas`;
+  const totalLabel=`${fmtHours(sum(rows))} ${L("horas", "hours")}`;
   document.getElementById("approvalDetailTotal").textContent=totalLabel;
   document.getElementById("approvalDetailTotalFooter").textContent=totalLabel;
   const groups=approvalGroups(rows);
   document.getElementById("approvalDetailBody").innerHTML=groups.length
-    ? groups.map(group=>group.rows.map(row=>`<tr>${row.map((value,index)=>`<td class="${index===row.length-1?"num":""}">${esc(value)}</td>`).join("")}</tr>`).join("")+`<tr class="approval-client-total-row"><td colspan="7"><div class="approval-total-summary approval-overall-total approval-client-total-card"><b>Total de horas ${esc(group.client)}</b><strong>${fmtHours(group.hours)} horas</strong></div></td></tr>`).join("")
+    ? groups.map(group=>group.rows.map(row=>`<tr>${row.map((value,index)=>`<td class="${index===row.length-1?"num":""}">${esc(value)}</td>`).join("")}</tr>`).join("")+`<tr class="approval-client-total-row"><td colspan="7"><div class="approval-total-summary approval-overall-total approval-client-total-card"><b>${esc(L("Total de horas", "Total hours"))} ${esc(group.client)}</b><strong>${fmtHours(group.hours)} ${esc(L("horas", "hours"))}</strong></div></td></tr>`).join("")
     : emptyRow(7);
 }
 
 function exportApprovalPdf() {
   const rows=approvalRows();
-  if (!rows.length) return toast("No hay datos para exportar.");
+  if (!rows.length) return toast(L("No hay datos para exportar.", "There is no data to export."));
   const data=approvalData(rows);
   const groups=approvalGroups(rows);
   const total=sum(rows);
-  if (!window.confirm(`Se exportará un reporte con ${fmtHours(total)} horas. ¿Continuar?`)) return;
-  if (!window.jspdf?.jsPDF) return toast("La biblioteca PDF no está disponible.");
+  if (!window.confirm(L(`Se exportará un reporte con ${fmtHours(total)} horas. ¿Continuar?`, `A report with ${fmtHours(total)} hours will be exported. Continue?`))) return;
+  if (!window.jspdf?.jsPDF) return toast(L("La biblioteca PDF no está disponible.", "The PDF library is not available."));
   const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:"mm",format:"letter",orientation:"landscape"});
-  if (typeof doc.autoTable !== "function") return toast("La extensión de tablas PDF no está disponible.");
+  if (typeof doc.autoTable !== "function") return toast(L("La extensión de tablas PDF no está disponible.", "The PDF table extension is not available."));
   const width=doc.internal.pageSize.getWidth(); const height=doc.internal.pageSize.getHeight();
   const headerPages=new Set();
-  const drawHeader=()=>{const page=doc.internal.getCurrentPageInfo().pageNumber;if(headerPages.has(page))return;headerPages.add(page);doc.setFillColor(4,8,20);doc.rect(0,0,width,24,"F");doc.setFillColor(148,64,255);doc.rect(0,0,width,3,"F");doc.setTextColor(255,255,255);doc.setFontSize(15);doc.text("CLARILIUM — Reporte mensual de horas",14,15);};
-  const drawFooter=()=>{doc.setTextColor(102,112,133);doc.setFontSize(7);doc.text(`Página ${doc.internal.getCurrentPageInfo().pageNumber}`,width-10,height-7,{align:"right"});};
-  const drawTotal=(label,hours,y)=>{doc.setFillColor(243,234,255);doc.rect(10,y,width-20,12,"F");doc.setFillColor(148,64,255);doc.rect(10,y,2,12,"F");doc.setTextColor(13,23,40);doc.setFontSize(10);doc.setFont("helvetica","bold");doc.text(label,16,y+8);doc.text(`${fmtHours(hours)} horas`,width-16,y+8,{align:"right"});doc.setFont("helvetica","normal");return y+18;};
+  const drawHeader=()=>{const page=doc.internal.getCurrentPageInfo().pageNumber;if(headerPages.has(page))return;headerPages.add(page);doc.setFillColor(4,8,20);doc.rect(0,0,width,24,"F");doc.setFillColor(148,64,255);doc.rect(0,0,width,3,"F");doc.setTextColor(255,255,255);doc.setFontSize(15);doc.text(L("CLARILIUM — Reporte mensual de horas", "CLARILIUM — Monthly hours report"),14,15);};
+  const drawFooter=()=>{doc.setTextColor(102,112,133);doc.setFontSize(7);doc.text(`${L("Página", "Page")} ${doc.internal.getCurrentPageInfo().pageNumber}`,width-10,height-7,{align:"right"});};
+  const drawTotal=(label,hours,y)=>{doc.setFillColor(243,234,255);doc.rect(10,y,width-20,12,"F");doc.setFillColor(148,64,255);doc.rect(10,y,2,12,"F");doc.setTextColor(13,23,40);doc.setFontSize(10);doc.setFont("helvetica","bold");doc.text(label,16,y+8);doc.text(`${fmtHours(hours)} ${L("horas", "hours")}`,width-16,y+8,{align:"right"});doc.setFont("helvetica","normal");return y+18;};
   drawHeader();
-  let y=drawTotal("Total de horas",total,30);
+  let y=drawTotal(L("Total de horas", "Total hours"),total,30);
   const pdfBody=groups.flatMap(group=>[
     ...group.rows,
-    [{content:`Total de horas ${group.client}`,colSpan:6,styles:{fillColor:[243,234,255],fontStyle:"bold",lineColor:[148,64,255],lineWidth:{top:.2,bottom:.2,left:1.2}}},{content:`${fmtHours(group.hours)} horas`,styles:{fillColor:[243,234,255],fontStyle:"bold",halign:"right",lineColor:[148,64,255],lineWidth:{top:.2,right:.2,bottom:.2}}}]
+    [{content:`${L("Total de horas", "Total hours")} ${group.client}`,colSpan:6,styles:{fillColor:[243,234,255],fontStyle:"bold",lineColor:[148,64,255],lineWidth:{top:.2,bottom:.2,left:1.2}}},{content:`${fmtHours(group.hours)} ${L("horas", "hours")}`,styles:{fillColor:[243,234,255],fontStyle:"bold",halign:"right",lineColor:[148,64,255],lineWidth:{top:.2,right:.2,bottom:.2}}}]
   ]);
   doc.autoTable({head:[data.headers],body:pdfBody,startY:y,margin:{top:30,left:10,right:10,bottom:16},theme:"striped",headStyles:{fillColor:[13,23,40],textColor:255},alternateRowStyles:{fillColor:[247,247,248]},styles:{fontSize:7,cellPadding:2,overflow:"linebreak"},columnStyles:{0:{cellWidth:25},1:{cellWidth:22},2:{cellWidth:29},3:{cellWidth:31},4:{cellWidth:32},5:{cellWidth:"auto"},6:{cellWidth:16,halign:"right"}},rowPageBreak:"avoid",showHead:"everyPage",willDrawPage:drawHeader,didDrawPage:drawFooter});
   y=doc.lastAutoTable.finalY+8;
   let footerNeedsPageNumber=false;
   if(y>height-30){doc.addPage();drawHeader();y=30;footerNeedsPageNumber=true;}
-  drawTotal("Total de horas",total,y);
+  drawTotal(L("Total de horas", "Total hours"),total,y);
   if(footerNeedsPageNumber)drawFooter();
-  const period=state.filters.period||"todos-los-periodos";
-  doc.save(`reporte-aprobacion-${period}.pdf`);
+  const period=state.filters.period||L("todos-los-periodos", "all-periods");
+  doc.save(`${L("reporte-aprobacion", "approval-report")}-${period}.pdf`);
 }
 
 function rateFor(name,date,rates,nameField="name") {
@@ -1059,7 +1066,7 @@ function renderClientBilling(rows) {
   const groups=new Map();
   rows.forEach(r=>{const rate=rateFor(r.client,r.date,state.clientRates,"name");const key=[r.client,r.requirement,rateSignature(rate)].join("¦");if(!groups.has(key))groups.set(key,{client:r.client,requirement:r.requirement,rate,records:[]});groups.get(key).records.push(r);});
   const output=[...groups.values()].map(g=>{const hours=sum(g.records);return{...g,hours,...calculateAmounts(hours,g.rate)};}).sort((a,b)=>a.client.localeCompare(b.client)||a.requirement.localeCompare(b.requirement,"es",{numeric:true}));
-  document.getElementById("clientBillingBody").innerHTML=output.length?output.map(r=>`<tr><td><b>${esc(r.client)}</b></td><td>${esc(r.requirement)}</td><td>${r.rate?`${esc(r.rate.from||"Inicio")} — ${esc(r.rate.to||"Actual")}`:"—"}</td><td class="num">${fmtHours(r.hours)}</td><td class="num">${r.rate?money(toMinor(r.rate.rate),r.currency)+"/h":"—"}</td><td class="num">${r.pending?"—":money(r.subtotal,r.currency)}</td><td class="num">${r.pending?"—":money(r.vat,r.currency)}</td><td class="num">${r.pending?"—":money(r.adjustment,r.currency)}</td><td class="num"><b>${r.pending?"—":money(r.total,r.currency)}</b></td><td><span class="status ${r.pending?"status--pending":"status--ok"}">${r.pending?"Tarifa pendiente":"Calculado"}</span></td></tr>`).join(""):emptyRow(10);
+  document.getElementById("clientBillingBody").innerHTML=output.length?output.map(r=>`<tr><td><b>${esc(r.client)}</b></td><td>${esc(r.requirement)}</td><td>${r.rate?`${esc(r.rate.from||L("Inicio", "Start"))} — ${esc(r.rate.to||L("Actual", "Current"))}`:"—"}</td><td class="num">${fmtHours(r.hours)}</td><td class="num">${r.rate?money(toMinor(r.rate.rate),r.currency)+"/h":"—"}</td><td class="num">${r.pending?"—":money(r.subtotal,r.currency)}</td><td class="num">${r.pending?"—":money(r.vat,r.currency)}</td><td class="num">${r.pending?"—":money(r.adjustment,r.currency)}</td><td class="num"><b>${r.pending?"—":money(r.total,r.currency)}</b></td><td><span class="status ${r.pending?"status--pending":"status--ok"}">${r.pending?L("Tarifa pendiente", "Rate pending"):L("Calculado", "Calculated")}</span></td></tr>`).join(""):emptyRow(10);
   renderBillingSummary("clientBillingSummary",output);
   state.clientBillingOutput=output;
 }
@@ -1067,7 +1074,7 @@ function renderClientBilling(rows) {
 function renderBillingSummary(id,output) {
   const pending=output.filter(r=>r.pending).reduce((a,r)=>a+r.hours,0);
   const currencies=groupBy(output.filter(r=>!r.pending),r=>r.currency);
-  const cards=[`<article class="billing-card"><span>Horas consideradas</span><b>${fmtHours(output.reduce((a,r)=>a+r.hours,0))}</b></article>`,... [...currencies].map(([currency,rows])=>`<article class="billing-card"><span>Total estimado · ${esc(currency)}</span><b>${money(rows.reduce((a,r)=>a+r.total,0),currency)}</b></article>`),`<article class="billing-card warning"><span>Horas con tarifa pendiente</span><b>${fmtHours(pending)}</b></article>`];
+  const cards=[`<article class="billing-card"><span>${esc(L("Horas consideradas", "Hours considered"))}</span><b>${fmtHours(output.reduce((a,r)=>a+r.hours,0))}</b></article>`,... [...currencies].map(([currency,rows])=>`<article class="billing-card"><span>${esc(L("Total estimado", "Estimated total"))} · ${esc(currency)}</span><b>${money(rows.reduce((a,r)=>a+r.total,0),currency)}</b></article>`),`<article class="billing-card warning"><span>${esc(L("Horas con tarifa pendiente", "Hours with rate pending"))}</span><b>${fmtHours(pending)}</b></article>`];
   document.getElementById(id).innerHTML=cards.join("");
 }
 
@@ -1090,12 +1097,12 @@ function renderCollabBilling(rows) {
   const discrepancy=rows.filter(r=>attributedConsultant(r)!==r.consultant);
   const unmatched=state.collaboratorSource==="comment"?rows.filter(r=>parseCommentConsultant(r).unmatched):[];
   const alert=document.getElementById("discrepancyAlert");
-  if(discrepancy.length||unmatched.length){alert.hidden=false;alert.textContent=`${discrepancy.length} registros difieren del Desarrollador original. ${unmatched.length?`${unmatched.length} comentarios no coincidieron con el catálogo y conservaron el desarrollador.`:""} Cada registro se atribuye una sola vez.`;}else alert.hidden=true;
+  if(discrepancy.length||unmatched.length){alert.hidden=false;alert.textContent=L(`${discrepancy.length} registros difieren del Desarrollador original. ${unmatched.length?`${unmatched.length} comentarios no coincidieron con el catálogo y conservaron el desarrollador.`:""} Cada registro se atribuye una sola vez.`, `${discrepancy.length} records differ from the original Developer. ${unmatched.length?`${unmatched.length} comments did not match the catalog and kept the developer.`:""} Each record is attributed only once.`);}else alert.hidden=true;
   document.getElementById("manualAssignmentsPanel").hidden=state.collaboratorSource!=="manual";
   const groups=new Map();
   rows.forEach(r=>{const name=attributedConsultant(r);const rate=rateFor(name,r.date,state.collabRates,"name");const key=[name,r.client,r.requirement,rateSignature(rate)].join("¦");if(!groups.has(key))groups.set(key,{name,client:r.client,requirement:r.requirement,rate,records:[]});groups.get(key).records.push(r);});
   const output=[...groups.values()].map(g=>{const hours=sum(g.records);return{...g,hours,capacity:Number(g.rate?.capacity)||null,...calculateAmounts(hours,g.rate)};}).sort((a,b)=>a.name.localeCompare(b.name)||a.client.localeCompare(b.client));
-  document.getElementById("collabBillingBody").innerHTML=output.length?output.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.client)}</td><td>${esc(r.requirement)}</td><td class="num">${fmtHours(r.hours)}</td><td class="num">${r.capacity?fmtHours(r.capacity):"Pendiente"}</td><td class="num">${r.rate?money(toMinor(r.rate.rate),r.currency)+"/h":"—"}</td><td class="num">${r.pending?"—":money(r.subtotal,r.currency)}</td><td class="num">${r.pending?"—":money(r.vat,r.currency)}</td><td class="num">${r.pending?"—":money(r.adjustment,r.currency)}</td><td class="num"><b>${r.pending?"—":money(r.total,r.currency)}</b></td><td><span class="status ${r.pending?"status--pending":"status--ok"}">${r.pending?"Tarifa pendiente":"Calculado"}</span></td></tr>`).join(""):emptyRow(11);
+  document.getElementById("collabBillingBody").innerHTML=output.length?output.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.client)}</td><td>${esc(r.requirement)}</td><td class="num">${fmtHours(r.hours)}</td><td class="num">${r.capacity?fmtHours(r.capacity):L("Pendiente", "Pending")}</td><td class="num">${r.rate?money(toMinor(r.rate.rate),r.currency)+"/h":"—"}</td><td class="num">${r.pending?"—":money(r.subtotal,r.currency)}</td><td class="num">${r.pending?"—":money(r.vat,r.currency)}</td><td class="num">${r.pending?"—":money(r.adjustment,r.currency)}</td><td class="num"><b>${r.pending?"—":money(r.total,r.currency)}</b></td><td><span class="status ${r.pending?"status--pending":"status--ok"}">${r.pending?L("Tarifa pendiente", "Rate pending"):L("Calculado", "Calculated")}</span></td></tr>`).join(""):emptyRow(11);
   renderBillingSummary("collabBillingSummary",output); state.collabBillingOutput=output; renderManualAssignments(rows);
 }
 
@@ -1106,11 +1113,11 @@ function renderRateEditors() {
 
 function rateSelect(values,current) { return values.map(v=>`<option value="${esc(v)}"${v===current?" selected":""}>${esc(v)}</option>`).join(""); }
 function adjustmentSelect(current) {
-  return [["none","Sin ajuste"],["percent","Porcentaje"],["amount","Importe"]].map(([value,label])=>`<option value="${value}"${value===current?" selected":""}>${label}</option>`).join("");
+  return [["none",L("Sin ajuste", "No adjustment")],["percent",L("Porcentaje", "Percentage")],["amount",L("Importe", "Amount")]].map(([value,label])=>`<option value="${value}"${value===current?" selected":""}>${label}</option>`).join("");
 }
 function renderRateTable(id,rates,type) {
   const names=type==="client"?unique([...state.catalogs.clients,...state.records.map(r=>r.client)]):unique([...state.catalogs.developers,...state.records.map(r=>r.consultant)]);
-  document.getElementById(id).innerHTML=rates.length?rates.map(r=>`<tr data-rate-id="${esc(r.id)}" data-rate-type="${type}"><td><select data-field="name">${rateSelect(names.sort(),r.name)}</select></td><td><input data-field="rate" type="number" min="0" step="0.01" value="${esc(r.rate)}"></td><td><select data-field="currency">${rateSelect(["MXN","USD"],r.currency||"MXN")}</select></td><td><input data-field="vat" type="number" step="0.01" value="${esc(r.vat||0)}"></td><td><input data-field="adjustmentName" value="${esc(r.adjustmentName||"")}" placeholder="Retención/bono"></td><td><select data-field="adjustmentType">${adjustmentSelect(r.adjustmentType||"none")}</select></td><td><input data-field="adjustmentValue" type="number" step="0.01" value="${esc(r.adjustmentValue||0)}"></td>${type==="collab"?`<td><input data-field="capacity" type="number" min="0" step="0.5" value="${esc(r.capacity||"")}"></td>`:""}<td><input data-field="from" type="date" value="${esc(r.from||"")}"></td><td><input data-field="to" type="date" value="${esc(r.to||"")}"></td><td><button class="remove-row" type="button" aria-label="Eliminar tarifa">×</button></td></tr>`).join(""):emptyRow(type==="collab"?11:10);
+  document.getElementById(id).innerHTML=rates.length?rates.map(r=>`<tr data-rate-id="${esc(r.id)}" data-rate-type="${type}"><td><select data-field="name">${rateSelect(names.sort(),r.name)}</select></td><td><input data-field="rate" type="number" min="0" step="0.01" value="${esc(r.rate)}"></td><td><select data-field="currency">${rateSelect(["MXN","USD"],r.currency||"MXN")}</select></td><td><input data-field="vat" type="number" step="0.01" value="${esc(r.vat||0)}"></td><td><input data-field="adjustmentName" value="${esc(r.adjustmentName||"")}" placeholder="${esc(L("Retención/bono", "Withholding/bonus"))}"></td><td><select data-field="adjustmentType">${adjustmentSelect(r.adjustmentType||"none")}</select></td><td><input data-field="adjustmentValue" type="number" step="0.01" value="${esc(r.adjustmentValue||0)}"></td>${type==="collab"?`<td><input data-field="capacity" type="number" min="0" step="0.5" value="${esc(r.capacity||"")}"></td>`:""}<td><input data-field="from" type="date" value="${esc(r.from||"")}"></td><td><input data-field="to" type="date" value="${esc(r.to||"")}"></td><td><button class="remove-row" type="button" aria-label="${esc(L("Eliminar tarifa", "Remove rate"))}">×</button></td></tr>`).join(""):emptyRow(type==="collab"?11:10);
 }
 
 function addRate(type) {
@@ -1127,9 +1134,9 @@ function renderManualAssignments(rows=applyFilters(state.records)) {
 function billingExportRows(type) {
   const rows=type==="client"?(state.clientBillingOutput||[]):(state.collabBillingOutput||[]);
   return rows.map(r=>({
-    [type==="client"?"Cliente":"Colaborador"]:type==="client"?r.client:r.name,
-    ...(type==="collab"?{Cliente:r.client}:{}),Requerimiento:r.requirement,Horas:fmtHours(r.hours),
-    Tarifa:r.rate?Number(r.rate.rate):"Tarifa pendiente",Moneda:r.currency,Subtotal:r.pending?"":(r.subtotal/100).toFixed(2),IVA:r.pending?"":(r.vat/100).toFixed(2),Ajustes:r.pending?"":(r.adjustment/100).toFixed(2),Total:r.pending?"":(r.total/100).toFixed(2),Estado:r.pending?"Tarifa pendiente":"Calculado"
+    [type==="client"?L("Cliente","Client"):L("Colaborador","Contractor")]:type==="client"?r.client:r.name,
+    ...(type==="collab"?{[L("Cliente","Client")]:r.client}:{}),[L("Requerimiento","Requirement")]:r.requirement,[L("Horas","Hours")]:fmtHours(r.hours),
+    [L("Tarifa","Rate")]:r.rate?Number(r.rate.rate):L("Tarifa pendiente","Rate pending"),[L("Moneda","Currency")]:r.currency,Subtotal:r.pending?"":(r.subtotal/100).toFixed(2),[L("IVA","VAT")]:r.pending?"":(r.vat/100).toFixed(2),[L("Ajustes","Adjustments")]:r.pending?"":(r.adjustment/100).toFixed(2),Total:r.pending?"":(r.total/100).toFixed(2),[L("Estado","Status")]:r.pending?L("Tarifa pendiente","Rate pending"):L("Calculado","Calculated")
   }));
 }
 
@@ -1160,7 +1167,7 @@ function renderDiagnostico() {
 
 function toast(message) { const el=document.getElementById("toast");el.textContent=message;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),3200); }
 
-async function updateFromProvider(provider,{silent=false,successLabel="Fuente actualizada"}={}) {
+async function updateFromProvider(provider,{silent=false,successLabel=L("Fuente actualizada", "Source updated")}={}) {
   if(state.refreshPromise)return state.refreshPromise;
   state.syncStatus="loading";
   state.syncError="";
@@ -1172,7 +1179,7 @@ async function updateFromProvider(provider,{silent=false,successLabel="Fuente ac
       marcarEnVivo();
       state.syncError="";
       loadPayload(payload,{preserveUi:Boolean(state.dataSignature)});
-      if(!silent)toast(`${successLabel}: ${state.records.length} registros válidos.`);
+      if(!silent)toast(L(`${successLabel}: ${state.records.length} registros válidos.`, `${successLabel}: ${state.records.length} valid records.`));
       return true;
     }catch(error){
       state.syncStatus="error";
@@ -1190,7 +1197,7 @@ async function updateFromProvider(provider,{silent=false,successLabel="Fuente ac
 
 async function refreshRemoteData({silent=false, force=false}={}) {
   if (isDemo()) {
-    return updateFromProvider(new DemoDataProvider(), { silent, successLabel: "Modo demo" });
+    return updateFromProvider(new DemoDataProvider(), { silent, successLabel: L("Modo demo", "Demo mode") });
   }
   if (!auth.account) return false;
   // Evita golpear SharePoint en cada clic: fuera de la actualización periódica
@@ -1205,7 +1212,7 @@ async function refreshRemoteData({silent=false, force=false}={}) {
     if (!silent) toast(error.message);
     return false;
   }
-  return updateFromProvider(new GraphDataProvider(token), { silent, successLabel: "SharePoint actualizado" });
+  return updateFromProvider(new GraphDataProvider(token), { silent, successLabel: L("SharePoint actualizado", "SharePoint updated") });
 }
 
 function setView(view) {
@@ -1256,9 +1263,9 @@ function marcarEnVivo(error) {
   if (!el || isDemo()) return;
   el.hidden = false;
   el.classList.toggle("live-status--error", Boolean(error));
-  const hora = new Intl.DateTimeFormat("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date());
-  el.textContent = error ? "Sin conexión" : `En vivo · ${hora}`;
-  el.title = error ? error : "La página revisa cambios en SharePoint cada 15 segundos";
+  const hora = new Intl.DateTimeFormat(LOC(), { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date());
+  el.textContent = error ? L("Sin conexión", "Offline") : `${L("En vivo", "Live")} · ${hora}`;
+  el.title = error ? error : L("La página revisa cambios en SharePoint cada 15 segundos", "The page checks SharePoint for changes every 15 seconds");
 }
 
 /* ------------------------------------------------------------------ *
@@ -1278,7 +1285,7 @@ function abrirVentana(clave, url) {
   const ventana = window.open(url, "clarilium_" + clave,
     `popup=yes,width=${ancho},height=${alto},left=${izquierda},top=${arriba}`);
   if (!ventana) {
-    toast("El navegador bloqueó la ventana emergente. Permite ventanas emergentes para www.clarilium.com.");
+    toast(L("El navegador bloqueó la ventana emergente. Permite ventanas emergentes para www.clarilium.com.", "The browser blocked the pop-up window. Allow pop-ups for www.clarilium.com."));
     return;
   }
   ventanas[clave] = ventana;
@@ -1332,15 +1339,16 @@ function bindEvents() {
   consultantMixChart.addEventListener("mouseleave",()=>{consultantMixChart.style.cursor="default";});
   consultantMixChart.addEventListener("click",e=>{const chart=state.charts.consultantMixChart;if(!chart)return;const element=consultantElementFromPointer(e,chart,"xy");if(!element)return;const consultant=chart.data.labels[element.index];const client=chart.data.datasets[element.datasetIndex]?.label;if(consultant&&client)showConsultantDetail(consultant,client);});
   document.getElementById("pdfApproval").addEventListener("click",exportApprovalPdf);
-  document.getElementById("printApproval").addEventListener("click",()=>{const rows=approvalRows();if(!rows.length)return toast("No hay datos para imprimir.");if(window.confirm(`Se imprimirá un reporte con ${fmtHours(sum(rows))} horas. ¿Continuar?`))window.print();});
+  document.getElementById("printApproval").addEventListener("click",()=>{const rows=approvalRows();if(!rows.length)return toast(L("No hay datos para imprimir.", "There is no data to print."));if(window.confirm(L(`Se imprimirá un reporte con ${fmtHours(sum(rows))} horas. ¿Continuar?`, `A report with ${fmtHours(sum(rows))} hours will be printed. Continue?`)))window.print();});
   document.getElementById("addClientRate").addEventListener("click",()=>addRate("client"));
   document.getElementById("addCollabRate").addEventListener("click",()=>addRate("collab"));
   ["clientRatesBody","collabRatesBody"].forEach(id=>{const body=document.getElementById(id);body.addEventListener("change",rateEditorChange);body.addEventListener("click",rateEditorRemove);});
   document.getElementById("collabSource").value=state.collaboratorSource;
   document.getElementById("collabSource").addEventListener("change",e=>{state.collaboratorSource=e.target.value;saveStorage();updateAll();});
   document.getElementById("manualAssignmentsBody").addEventListener("change",e=>{if(!e.target.classList.contains("manual-select"))return;state.manualAssignments[e.target.closest("tr").dataset.recordId]=e.target.value;saveStorage();updateAll();});
-  document.querySelectorAll("[data-billing-export]").forEach(btn=>btn.addEventListener("click",()=>exportRows(billingExportRows(btn.dataset.billingExport),btn.dataset.format,btn.dataset.billingExport==="client"?"Facturación a clientes":"Pago a colaboradores",btn.dataset.billingExport==="client"?"facturacion-clientes":"pago-colaboradores")));
-  document.getElementById("themeToggle").addEventListener("click",()=>{document.body.classList.toggle("dark");saveStorage();updateAll();});
+  document.querySelectorAll("[data-billing-export]").forEach(btn=>btn.addEventListener("click",()=>exportRows(billingExportRows(btn.dataset.billingExport),btn.dataset.format,btn.dataset.billingExport==="client"?L("Facturación a clientes","Client billing"):L("Pago a colaboradores","Contractor payments"),btn.dataset.billingExport==="client"?L("facturacion-clientes","client-billing"):L("pago-colaboradores","contractor-payments"))));
+  // Tema e idioma: los botones los atiende preferencias.js; aqui solo se repinta.
+  window.CLARILIUM?.alCambiar(cambioDePreferencias);
   // Al volver a la pagina (por ejemplo, desde la ventana de captura) se revisa al instante.
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)revisarCambios();});
   window.addEventListener("focus",()=>revisarCambios());
@@ -1349,6 +1357,20 @@ function bindEvents() {
   document.getElementById("refreshNow").addEventListener("click",()=>refreshRemoteData({force:true}));
   document.getElementById("signIn").addEventListener("click",()=>auth.signIn());
   document.getElementById("signOut").addEventListener("click",()=>auth.signOut());
+}
+
+// Cambio de idioma o de tema (preferencias.js): se reconstruyen los textos
+// armados aqui sin perder filtros ni selecciones. Las graficas se repintan
+// tambien con el tema, porque sus colores dependen de el.
+function cambioDePreferencias() {
+  const ui = captureUiState();
+  state.selectedClient = ""; state.selectedConsultant = ""; state.selectedConsultantClient = "";
+  populateControls();
+  restoreUiState(ui);
+  updateAll();
+  if (auth.account || isDemo()) renderAccountChip();
+  if (state.syncStatus === "ok") marcarEnVivo();
+  else if (state.syncStatus === "error") marcarEnVivo(state.syncError);
 }
 
 function rateEditorChange(e) {
@@ -1365,14 +1387,14 @@ async function init() {
   const vigilante = setTimeout(() => {
     const girando = document.getElementById("authSpinner");
     if (girando && !girando.hidden) {
-      mostrarFalla("La conexión con Microsoft está tardando más de lo normal. Revisa tu conexión y vuelve a intentar.");
+      mostrarFalla(L("La conexión con Microsoft está tardando más de lo normal. Revisa tu conexión y vuelve a intentar.", "The connection to Microsoft is taking longer than usual. Check your connection and try again."));
     }
   }, 25000);
   try {
     await iniciar();
   } catch (error) {
     console.error("TimeSheet: fallo al iniciar", error);
-    mostrarFalla(`No se pudo iniciar la página. ${error.message}`);
+    mostrarFalla(L(`No se pudo iniciar la página. ${error.message}`, `The page could not start. ${error.message}`));
   } finally {
     clearTimeout(vigilante);
   }
@@ -1381,9 +1403,8 @@ async function init() {
 async function iniciar() {
   const v = versionesPublicadas();
   if (v.html !== VERSION_TIMESHEET || v.css !== VERSION_TIMESHEET) {
-    throw new Error(`Los archivos publicados no coinciden entre sí (página ${v.html}, estilos ${v.css}, código ${v.js}). Hay que volver a publicar timesheet.html, timesheet.css y timesheet.js juntos.`);
+    throw new Error(L(`Los archivos publicados no coinciden entre sí (página ${v.html}, estilos ${v.css}, código ${v.js}). Hay que volver a publicar timesheet.html, timesheet.css y timesheet.js juntos.`, `The published files do not match each other (page ${v.html}, styles ${v.css}, code ${v.js}). Republish timesheet.html, timesheet.css and timesheet.js together.`));
   }
-  document.body.classList.toggle("dark",saved.theme==="dark");
   bindEvents();
   populateControls();
   updateAll();

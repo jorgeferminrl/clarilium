@@ -8,26 +8,20 @@
  * Contenido: menu con las herramientas (Timesheet, Estimacion y el
  * repositorio de SharePoint), noticias de SAP que entrega /api/noticias y un
  * aviso critico de carga de horas los jueves, viernes y los ultimos 3 dias
- * de cada mes. */
+ * de cada mes.
+ *
+ * Idioma y tema: los maneja preferencias.js (mismas claves que todo el sitio).
+ * Los textos fijos del HTML llevan su version en ingles en data-en; los que
+ * se arman aqui usan t("español", "English"). */
 
 // Grupo de Entra ID "CLARILIUM Reportes - Administradores" (el mismo del TimeSheet).
 const GRUPO_ADMIN = "6ee2df68-1c63-4303-b1ee-8367adbf035f";
-const CLAVE_TEMA = "clarilium-portal-tema";
 const MAX_NOTICIAS = 10;
+const t = (es, en) => CLARILIUM.t(es, en);
 
 /* ------------------------------------------------------------------ *
- * Tema claro / oscuro
- * ------------------------------------------------------------------ */
-function leerTema() {
-  try { return localStorage.getItem(CLAVE_TEMA); } catch { return null; }
-}
-
-function guardarTema(tema) {
-  try { localStorage.setItem(CLAVE_TEMA, tema); } catch { /* disco o modo privado */ }
-}
-
-/* ------------------------------------------------------------------ *
- * Enlaces: publicados apuntan a /timesheet y /estimacion; abiertos desde
+ * Enlaces: publicados apuntan a /portal/timesheet, /estimacion y
+ * /portal/facturacion; abiertos desde
  * el disco apuntan a los archivos .html vecinos.
  * ------------------------------------------------------------------ */
 function ajustarEnlacesDemo() {
@@ -52,29 +46,51 @@ function menuAbierto(abrir) {
 }
 
 /* ------------------------------------------------------------------ *
- * Aviso critico: jueves, viernes y los ultimos 3 dias del mes
- * (fecha local de quien consulta).
+ * Aviso critico (fecha local de quien consulta):
+ *   - Ultimos 3 dias habiles del mes (lunes a viernes): en rojo.
+ *   - Jueves y viernes: en amarillo.
+ * Si un jueves o viernes cae en los ultimos 3 dias habiles, gana el rojo.
+ * No considera dias festivos.
  * ------------------------------------------------------------------ */
-function tocaAviso(hoy = new Date()) {
-  const dia = hoy.getDay();                       // 4 = jueves, 5 = viernes
-  if (dia === 4 || dia === 5) return true;
-  const ultimo = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
-  return hoy.getDate() > ultimo - 3;
+function esHabil(fecha) { const d = fecha.getDay(); return d !== 0 && d !== 6; }
+
+function esCierreDeMes(hoy) {
+  if (!esHabil(hoy)) return false;
+  let habiles = 0;
+  const dia = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);   // ultimo dia del mes
+  while (habiles < 3) {
+    if (esHabil(dia)) {
+      habiles += 1;
+      if (dia.getDate() === hoy.getDate()) return true;
+    }
+    dia.setDate(dia.getDate() - 1);
+  }
+  return false;
+}
+
+function tipoAviso(hoy = new Date()) {
+  if (esCierreDeMes(hoy)) return "cierre";
+  const d = hoy.getDay();                          // 4 = jueves, 5 = viernes
+  return d === 4 || d === 5 ? "semanal" : null;
 }
 
 function actualizarAviso() {
-  // Solo en modo demo: ?aviso=1 lo fuerza para revisar el diseno cualquier dia.
-  const forzado = esDemo() && new URLSearchParams(window.location.search).get("aviso") === "1";
-  $("aviso").hidden = !(forzado || tocaAviso());
+  // Solo en modo demo, para revisar el diseno cualquier dia:
+  // ?aviso=1 (amarillo) o ?aviso=cierre (rojo).
+  const forzado = esDemo() ? new URLSearchParams(window.location.search).get("aviso") : null;
+  const tipo = forzado === "cierre" ? "cierre" : forzado === "1" ? "semanal" : tipoAviso();
+  const aviso = $("aviso");
+  aviso.hidden = !tipo;
+  aviso.classList.toggle("aviso--semanal", tipo === "semanal");
+  aviso.classList.toggle("aviso--cierre", tipo === "cierre");
 }
 
 /* ------------------------------------------------------------------ *
  * Noticias
  * ------------------------------------------------------------------ */
 const FUENTES = ["sapnews", "community"];
-
-const formatoFecha = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric" });
-const formatoHora = new Intl.DateTimeFormat("es-MX", { hour: "numeric", minute: "2-digit" });
+const noticiasPorIdioma = {};     // idioma -> ultima respuesta buena
+let ultimaCarga = null;           // { idioma, datos } o { idioma, error }
 
 function crear(etiqueta, clase, texto) {
   const el = document.createElement(etiqueta);
@@ -103,13 +119,15 @@ function pintarFuente(id, fuente) {
   const lista = $(`noticias-${id}`);
   lista.setAttribute("aria-busy", "false");
   const items = (fuente?.items || []).slice(0, MAX_NOTICIAS);
+  const formatoFecha = new Intl.DateTimeFormat(CLARILIUM.locale(), { day: "numeric", month: "short", year: "numeric" });
 
   if (!items.length) {
     const li = crear("li", "news-item");
     li.append(crear("p", fuente?.ok === false ? "news-empty news-empty--error" : "news-empty",
       fuente?.ok === false
-        ? "No se pudieron cargar las noticias de esta fuente en este momento. Usa «Ver sitio» o vuelve a intentar más tarde."
-        : "Sin publicaciones recientes."));
+        ? t("No se pudieron cargar las noticias de esta fuente en este momento. Usa «Ver sitio» o vuelve a intentar más tarde.",
+            "News from this source could not be loaded right now. Use “Visit site” or try again later.")
+        : t("Sin publicaciones recientes.", "No recent posts.")));
     lista.replaceChildren(li);
     return;
   }
@@ -117,7 +135,7 @@ function pintarFuente(id, fuente) {
   lista.replaceChildren(...items.map(n => {
     const li = crear("li", "news-item");
     const url = enlaceSeguro(n.enlace);
-    const titulo = crear(url ? "a" : "span", "news-item__title", n.titulo || "(sin título)");
+    const titulo = crear(url ? "a" : "span", "news-item__title", n.titulo || t("(sin título)", "(untitled)"));
     if (url) { titulo.href = url; titulo.target = "_blank"; titulo.rel = "noopener noreferrer"; }
     li.append(titulo);
 
@@ -129,76 +147,125 @@ function pintarFuente(id, fuente) {
   }));
 }
 
-function noticiasDemo() {
+function pintarEstado() {
+  const estado = $("noticiasEstado");
+  estado.classList.remove("section-context--error");
+  if (!ultimaCarga) { estado.textContent = t("Cargando noticias…", "Loading news…"); return; }
+  if (ultimaCarga.error) {
+    estado.textContent = t("No se pudieron cargar las noticias. Revisa tu conexión y vuelve a intentar.",
+                           "News could not be loaded. Check your connection and try again.");
+    estado.classList.add("section-context--error");
+    return;
+  }
+  const datos = ultimaCarga.datos;
+  const hora = new Intl.DateTimeFormat(CLARILIUM.locale(), { hour: "numeric", minute: "2-digit" })
+    .format(datos.generado ? new Date(datos.generado) : new Date());
+  let texto = t(`Lo más reciente de SAP News Center y SAP Community. Actualizado a las ${hora}`,
+                `The latest from SAP News Center and SAP Community. Updated at ${hora}`);
+  if (!/\.$/.test(texto)) texto += ".";
+  if (ultimaCarga.idioma === "es") {
+    texto += datos.traduccion === "ok"
+      ? " Traducción automática al español."
+      : " La traducción automática no está disponible por ahora; las noticias se muestran en inglés.";
+  }
+  estado.textContent = texto;
+}
+
+function noticiasDemo(idioma) {
   const hoy = Date.now(), dia = 86400000;
-  const ej = (titulo, autor, dias, resumen) => ({ titulo, enlace: "https://news.sap.com/", autor, fecha: new Date(hoy - dias * dia).toISOString(), resumen });
+  const es = idioma === "es";
+  const ej = (tituloEs, tituloEn, autor, dias, resumenEs, resumenEn) => ({
+    titulo: es ? tituloEs : tituloEn, enlace: "https://news.sap.com/",
+    autor: autor === "Autor de ejemplo" && !es ? "Sample author" : autor,
+    fecha: new Date(hoy - dias * dia).toISOString(), resumen: es ? resumenEs : resumenEn
+  });
   return {
     generado: new Date().toISOString(),
+    traduccion: es ? "ok" : undefined,
     fuentes: [
       { id: "sapnews", ok: true, items: [
-        ej("Noticia de ejemplo: SAP presenta nuevas capacidades de IA", "SAP News", 0, "Texto de ejemplo. Publicada, esta sección muestra las noticias reales de news.sap.com."),
-        ej("Noticia de ejemplo: actualización de SAP Business Technology Platform", "SAP News", 1, "Texto de ejemplo con el resumen de la publicación."),
-        ej("Noticia de ejemplo: resultados trimestrales", "SAP News", 3, "Texto de ejemplo con el resumen de la publicación.")
+        ej("Noticia de ejemplo: SAP presenta nuevas capacidades de IA", "Sample news: SAP introduces new AI capabilities", "SAP News", 0,
+           "Texto de ejemplo. Publicada, esta sección muestra las noticias reales de news.sap.com.", "Sample text. Once published, this section shows the real news from news.sap.com."),
+        ej("Noticia de ejemplo: actualización de SAP Business Technology Platform", "Sample news: SAP Business Technology Platform update", "SAP News", 1,
+           "Texto de ejemplo con el resumen de la publicación.", "Sample text with the post summary."),
+        ej("Noticia de ejemplo: resultados trimestrales", "Sample news: quarterly results", "SAP News", 3,
+           "Texto de ejemplo con el resumen de la publicación.", "Sample text with the post summary.")
       ] },
       { id: "community", ok: true, items: [
-        ej("Blog de ejemplo: buenas prácticas de ABAP Cloud", "Autor de ejemplo", 0, "Texto de ejemplo. Publicada, esta sección muestra los blogs reales de SAP Community."),
-        ej("Blog de ejemplo: extensiones Fiori con SAPUI5", "Autor de ejemplo", 2, "Texto de ejemplo con el resumen del blog."),
-        ej("Blog de ejemplo: integración con SAP Integration Suite", "Autor de ejemplo", 4, "Texto de ejemplo con el resumen del blog.")
+        ej("Blog de ejemplo: buenas prácticas de ABAP Cloud", "Sample blog: ABAP Cloud best practices", "Autor de ejemplo", 0,
+           "Texto de ejemplo. Publicada, esta sección muestra los blogs reales de SAP Community.", "Sample text. Once published, this section shows the real SAP Community blogs."),
+        ej("Blog de ejemplo: extensiones Fiori con SAPUI5", "Sample blog: Fiori extensions with SAPUI5", "Autor de ejemplo", 2,
+           "Texto de ejemplo con el resumen del blog.", "Sample text with the blog summary."),
+        ej("Blog de ejemplo: integración con SAP Integration Suite", "Sample blog: integration with SAP Integration Suite", "Autor de ejemplo", 4,
+           "Texto de ejemplo con el resumen del blog.", "Sample text with the blog summary.")
       ] }
     ]
   };
 }
 
-let cargandoNoticias = false;
+let cargaEnCurso = 0;
 
-async function cargarNoticias() {
-  if (cargandoNoticias) return;
-  cargandoNoticias = true;
-  const estado = $("noticiasEstado");
-  const boton = $("refreshNow");
-  estado.classList.remove("section-context--error");
-  estado.textContent = "Cargando noticias…";
-  boton.disabled = true;
+async function cargarNoticias({ forzar = false } = {}) {
+  const idioma = CLARILIUM.idioma();
+  const turno = ++cargaEnCurso;   // si cambian de idioma a medio camino, gana la ultima
+
+  if (!forzar && noticiasPorIdioma[idioma]) {
+    ultimaCarga = { idioma, datos: noticiasPorIdioma[idioma] };
+    FUENTES.forEach(id => pintarFuente(id, (ultimaCarga.datos.fuentes || []).find(f => f.id === id)));
+    pintarEstado();
+    return;
+  }
+
+  ultimaCarga = null;
+  pintarEstado();
+  $("refreshNow").disabled = true;
   FUENTES.forEach(id => pintarCargando($(`noticias-${id}`)));
 
+  let resultado;
   try {
     let datos;
     if (esDemo()) {
-      datos = noticiasDemo();
+      datos = noticiasDemo(idioma);
     } else {
-      let r;
-      try { r = await fetch("/api/noticias", { headers: { Accept: "application/json" }, cache: "no-cache" }); }
-      catch { throw new Error("No se pudo contactar al servidor. Revisa tu conexión a internet."); }
-      if (!r.ok) throw new Error(`El servidor de noticias respondió HTTP ${r.status}.`);
+      const r = await fetch(`/api/noticias?idioma=${idioma}`, { headers: { Accept: "application/json" }, cache: "no-cache" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       datos = await r.json();
     }
-    FUENTES.forEach(id => pintarFuente(id, (datos.fuentes || []).find(f => f.id === id)));
-    const generado = datos.generado ? new Date(datos.generado) : new Date();
-    const hora = formatoHora.format(generado);
-    estado.textContent = `Lo más reciente de SAP News Center y SAP Community. Actualizado a las ${hora}${hora.endsWith(".") ? "" : "."}`;
+    noticiasPorIdioma[idioma] = datos;
+    resultado = { idioma, datos };
   } catch (error) {
-    FUENTES.forEach(id => pintarFuente(id, { ok: false, items: [] }));
-    estado.textContent = error.message || "No se pudieron cargar las noticias.";
-    estado.classList.add("section-context--error");
-  } finally {
-    boton.disabled = false;
-    cargandoNoticias = false;
+    console.error("Portal: noticias", error);
+    resultado = { idioma, error: true };
   }
+
+  if (turno !== cargaEnCurso) return;
+  ultimaCarga = resultado;
+  FUENTES.forEach(id => pintarFuente(id, resultado.error ? { ok: false, items: [] } : (resultado.datos.fuentes || []).find(f => f.id === id)));
+  pintarEstado();
+  $("refreshNow").disabled = false;
 }
 
 /* ------------------------------------------------------------------ *
  * Arranque
  * ------------------------------------------------------------------ */
-function rolDeCuenta() {
-  if (esDemo()) return "Administrador";
+function esAdmin() {
+  if (esDemo()) return true;
   const grupos = auth.account?.idTokenClaims?.groups;
-  return Array.isArray(grupos) && grupos.includes(GRUPO_ADMIN) ? "Administrador" : "Consultor";
+  return Array.isArray(grupos) && grupos.includes(GRUPO_ADMIN);
 }
 
-function alEntrar() {
-  const rol = rolDeCuenta();
+function pintarCuenta() {
+  const rol = esAdmin() ? t("Administrador", "Administrator") : t("Consultor", "Consultant");
+  if (esDemo()) $("cuentaNombre").textContent = t("Usuario Demo", "Demo User");
   $("cuentaRol").textContent = rol;
   $("cuenta").title = `${$("cuentaNombre").textContent} · ${rol}`;
+}
+
+let dentro = false;
+
+function alEntrar() {
+  dentro = true;
+  pintarCuenta();
   actualizarAviso();
   // Revisa cada 10 minutos: si la pagina queda abierta al cambiar el dia,
   // el aviso aparece o se retira solo.
@@ -210,14 +277,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Dentro del marco oculto de la verificacion silenciosa no se hace nada.
   if (window.self !== window.top) return;
 
-  document.body.classList.toggle("dark", leerTema() === "dark");
   ajustarEnlacesDemo();
 
-  $("themeToggle").addEventListener("click", () => {
-    const oscuro = document.body.classList.toggle("dark");
-    guardarTema(oscuro ? "dark" : "light");
-  });
-  $("refreshNow").addEventListener("click", () => { actualizarAviso(); cargarNoticias(); });
+  $("refreshNow").addEventListener("click", () => { actualizarAviso(); cargarNoticias({ forzar: true }); });
   $("menuToggle").addEventListener("click", () => menuAbierto(!$("sidebar").classList.contains("open")));
   $("main").addEventListener("click", () => menuAbierto(false));
   document.addEventListener("keydown", e => { if (e.key === "Escape") menuAbierto(false); });
@@ -230,8 +292,17 @@ document.addEventListener("DOMContentLoaded", () => {
     $("sidebar").style.removeProperty("height");
   });
 
-  iniciarPortal({ alEntrar, alDemo: alEntrar, nombreDemo: "Usuario Demo" }).catch(error => {
+  // Cambio de idioma: textos armados aqui y noticias en el idioma nuevo.
+  CLARILIUM.alCambiar(({ idioma }) => {
+    if (!dentro) return;
+    pintarCuenta();
+    if (ultimaCarga?.idioma !== idioma) cargarNoticias();
+    else pintarEstado();
+  });
+
+  pintarEstado();
+  iniciarPortal({ alEntrar, alDemo: alEntrar }).catch(error => {
     console.error("Portal: fallo al iniciar", error);
-    porton({ error: error.message || "Ocurrió un error inesperado.", reintentar: true });
+    porton({ error: error.message || t("Ocurrió un error inesperado.", "An unexpected error occurred."), reintentar: true });
   });
 });

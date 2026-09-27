@@ -9,7 +9,16 @@ const { app } = require('@azure/functions');
  * deja al navegador conectarse al propio sitio y a Microsoft, y los canales
  * de SAP no permiten lectura directa desde otros dominios (CORS).
  *
- * Solo lectura de contenido publico: no usa secretos ni variables de entorno.
+ * Idioma: ?idioma=en entrega las noticias tal cual; ?idioma=es (o sin
+ * parametro) las traduce al espanol con Azure AI Translator, plan gratuito F0
+ * (2 millones de caracteres al mes; al llegar al limite deja de traducir, no
+ * cobra). Cada noticia se traduce una sola vez y se recuerda. Si la traduccion
+ * no esta configurada o falla, se entregan en ingles con traduccion: "no".
+ *
+ * Variables de entorno (Azure Portal -> clarilium-web -> Variables de entorno):
+ *   TRADUCTOR_CLAVE   Clave del recurso de Translator (secreto: solo en Azure)
+ *   TRADUCTOR_REGION  Region del recurso, por ejemplo "centralus"
+ *
  * Defensas: tiempo limite por fuente, tamano maximo de respuesta, se quita
  * todo el HTML (el portal pinta solo texto) y solo pasan enlaces http/https.
  *
@@ -28,8 +37,10 @@ const MAX_BYTES     = 6 * 1024 * 1024;
 const MAX_ITEMS     = 12;
 const MAX_RESUMEN   = 280;
 
-let cache = null;                 // { t, cuerpo }
+let cache = null;                 // { t, fuentes } en ingles, tal cual llegan
 const ultimoBueno = new Map();    // id -> items
+const traducciones = new Map();   // texto original -> texto en espanol
+const MAX_TRADUCCIONES = 2000;
 
 /* ---------- Limpieza de texto ---------- */
 const ENTIDADES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', hellip: '…', ndash: '–', mdash: '—', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”' };
@@ -121,20 +132,77 @@ async function leerFuente(fuente, context) {
   }
 }
 
+/* ---------- Traduccion (Azure AI Translator) ---------- */
+async function traducirTextos(textos, context) {
+  const clave = process.env.TRADUCTOR_CLAVE;
+  const region = process.env.TRADUCTOR_REGION;
+  if (!clave || !region) return false;
+  const faltan = [...new Set(textos.filter(t => t && !traducciones.has(t)))];
+  if (!faltan.length) return true;
+  const control = new AbortController();
+  const reloj = setTimeout(() => control.abort(), TIEMPO_MAX_MS);
+  try {
+    // Hasta 100 textos por llamada (el servicio admite 1000 y 50 000 caracteres).
+    for (let i = 0; i < faltan.length; i += 100) {
+      const lote = faltan.slice(i, i + 100);
+      const r = await fetch('https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&to=es', {
+        method: 'POST',
+        signal: control.signal,
+        headers: {
+          'Ocp-Apim-Subscription-Key': clave,
+          'Ocp-Apim-Subscription-Region': region,
+          'Content-Type': 'application/json; charset=UTF-8'
+        },
+        body: JSON.stringify(lote.map(t => ({ Text: t })))
+      });
+      if (!r.ok) throw new Error(`Translator HTTP ${r.status}`);
+      const datos = await r.json();
+      lote.forEach((original, n) => {
+        const texto = datos?.[n]?.translations?.[0]?.text;
+        if (typeof texto === 'string' && texto.trim()) traducciones.set(original, texto.trim());
+      });
+    }
+    // Limpieza: la memoria no crece sin fin si la instancia vive mucho.
+    while (traducciones.size > MAX_TRADUCCIONES) traducciones.delete(traducciones.keys().next().value);
+    return true;
+  } catch (error) {
+    context.warn(`noticias: traduccion no disponible: ${error.message}`);
+    return false;
+  } finally {
+    clearTimeout(reloj);
+  }
+}
+
+async function enEspanol(fuentes, context) {
+  const textos = fuentes.flatMap(f => f.items.flatMap(n => [n.titulo, n.resumen]));
+  const ok = await traducirTextos(textos, context);
+  if (!ok) return { fuentes, traduccion: 'no' };
+  const tr = t => (t ? traducciones.get(t) || t : t);
+  return {
+    traduccion: 'ok',
+    fuentes: fuentes.map(f => ({ ...f, items: f.items.map(n => ({ ...n, titulo: tr(n.titulo), resumen: tr(n.resumen) })) }))
+  };
+}
+
 app.http('noticias', {
   methods: ['GET'],
   authLevel: 'anonymous',
   route: 'noticias',
   handler: async (request, context) => {
+    const idioma = request.query.get('idioma') === 'en' ? 'en' : 'es';
     const ahora = Date.now();
-    if (!cache || ahora - cache.t > VIGENCIA_MS) {
-      const fuentes = await Promise.all(FUENTES.map(f => leerFuente(f, context)));
-      const cuerpo = JSON.stringify({ generado: new Date(ahora).toISOString(), fuentes });
+    let fuentes, generado;
+    if (cache && ahora - cache.t <= VIGENCIA_MS) {
+      ({ fuentes, generado } = cache);
+    } else {
+      fuentes = await Promise.all(FUENTES.map(f => leerFuente(f, context)));
+      generado = new Date(ahora).toISOString();
       // Solo se guarda en cache si todas respondieron; si no, se reintenta en la siguiente visita.
-      cache = fuentes.every(f => f.ok && !f.desactualizado) ? { t: ahora, cuerpo } : null;
-      return respuesta(cuerpo);
+      cache = fuentes.every(f => f.ok && !f.desactualizado) ? { t: ahora, fuentes, generado } : null;
     }
-    return respuesta(cache.cuerpo);
+    if (idioma === 'en') return respuesta(JSON.stringify({ generado, idioma, fuentes }));
+    const es = await enEspanol(fuentes, context);
+    return respuesta(JSON.stringify({ generado, idioma, traduccion: es.traduccion, fuentes: es.fuentes }));
   }
 });
 
@@ -143,7 +211,8 @@ function respuesta(cuerpo) {
     status: 200,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'public, max-age=300',
+      'Cache-Control': 'private, max-age=300',
+      'Vary': 'Accept-Encoding',
       'X-Content-Type-Options': 'nosniff'
     },
     body: cuerpo
