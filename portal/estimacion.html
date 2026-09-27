@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#040814">
+  <title>Estimaciones · CLARILIUM</title>
+  <link rel="icon" href="../assets/img/favicon-32.png" sizes="32x32">
+  <link rel="stylesheet" href="../assets/css/portal.css">
+  <link rel="stylesheet" href="../assets/css/estimacion.css">
+</head>
+<body class="fmt-clarilium">
+  <div id="demoBanner" class="demo-banner" hidden>MODO DEMO · datos de ejemplo. Los clientes y usuarios reales solo se cargan en la página publicada.</div>
+
+  <header class="barra">
+    <div class="barra__dentro">
+      <img class="barra__logo" src="../assets/img/logo-nav-color.png" alt="CLARILIUM">
+      <span class="barra__titulo">Estimaciones</span>
+      <a id="volver" class="barra__volver" href="../portal">← Portal</a>
+      <span id="cuenta" class="cuenta" hidden><span id="cuentaNombre" class="cuenta__nombre"></span><button id="salir" class="cuenta__salir" type="button">Salir</button></span>
+    </div>
+  </header>
+
+  <main id="principal" class="principal" hidden>
+    <div class="controles">
+      <label class="controles__campo" for="formato">Formato
+        <select id="formato"><option value="CLARILIUM">CLARILIUM</option></select>
+      </label>
+      <span id="estadoCarga" class="estado" role="status"></span>
+    </div>
+
+    <form id="forma" class="hoja" novalidate autocomplete="off">
+      <div class="hoja__encabezado">
+        <img id="logoFormato" class="hoja__logo" alt="">
+        <h1 class="hoja__titulo">Estimación de construcción del requerimiento</h1>
+      </div>
+
+      <div class="hoja__datos">
+        <label class="et" for="idReq">ID Requerimiento:<span class="req" aria-hidden="true">*</span></label>
+        <div class="val"><input id="idReq" type="text" inputmode="numeric" maxlength="10" required aria-describedby="ayudaId"></div>
+        <label class="et" for="descripcion">Descripción<span class="req" aria-hidden="true">*</span></label>
+        <div class="val"><input id="descripcion" type="text" maxlength="75" required></div>
+
+        <label class="et" for="cliente">Cliente<span class="req" aria-hidden="true">*</span></label>
+        <div class="val"><select id="cliente" required><option value="">Selecciona…</option></select></div>
+        <label class="et" for="estimadoPor">Estimado por<span class="req" aria-hidden="true">*</span></label>
+        <div class="val"><select id="estimadoPor" required><option value="">Selecciona…</option></select></div>
+      </div>
+      <p id="ayudaId" class="solo-lector">Número entero de hasta 10 dígitos, sin ceros a la izquierda.</p>
+
+      <table class="hoja__tabla">
+        <colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+        <thead>
+          <tr><th scope="col">Tareas / Entregables</th><th scope="col">Resumen de la funcionalidad</th><th scope="col">Esfuerzo ( Horas )</th></tr>
+        </thead>
+        <tbody>
+          <tr class="seccion"><th scope="rowgroup" colspan="2">Análisis y Estimación ABAP</th><td></td></tr>
+          <tr class="fila fila--alta">
+            <th scope="row">Análisis</th>
+            <td class="resumen">Análisis de:<br>• Especificación funcional<br>• Script de pruebas<br>• Objetos de desarrollo<br>• Objetos de configuración<br><br>Sesiones con cliente y/o con consultor funcional</td>
+            <td class="horas"><input id="hAnalisis" class="h" type="text" inputmode="decimal" maxlength="6" aria-label="Horas de análisis"></td>
+          </tr>
+          <tr class="fila">
+            <th scope="row">Construcción</th>
+            <td class="resumen">Construcción de objetos de desarrollo y/o configuración</td>
+            <td class="horas"><input id="hConstruccion" class="h" type="text" inputmode="decimal" maxlength="6" aria-label="Horas de construcción"></td>
+          </tr>
+          <tr class="fila">
+            <th scope="row">Pruebas Unitarias ABAP</th>
+            <td class="resumen">Ejecución de las pruebas unitarias y generación de las evidencias de las pruebas</td>
+            <td class="horas"><input id="hPruebas" class="h" type="text" inputmode="decimal" maxlength="6" aria-label="Horas de pruebas unitarias"></td>
+          </tr>
+          <tr class="fila">
+            <th scope="row">Documentación</th>
+            <td class="resumen">Actualización de Especificación Técnica, Documento de Soporte o Análisis de Causas</td>
+            <td class="horas"><input id="hDocumentacion" class="h" type="text" inputmode="decimal" maxlength="6" aria-label="Horas de documentación"></td>
+          </tr>
+          <tr class="fila fila--alta">
+            <th scope="row">Control de Calidad</th>
+            <td class="resumen">Revisión de la calidad del código:<br>• Estándares de programación<br>• Mejores prácticas<br>• Rendimiento (Performance)<br><br>Revisión de la calidad de documentación a entregar</td>
+            <td class="horas"><input id="hCalidad" class="h" type="text" inputmode="decimal" maxlength="6" aria-label="Horas de control de calidad"></td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total"><th scope="row" colspan="2">Total del esfuerzo:</th><td><output id="total" for="hAnalisis hConstruccion hPruebas hDocumentacion hCalidad" aria-live="polite">0.0</output></td></tr>
+        </tfoot>
+      </table>
+    </form>
+
+    <div id="errores" class="errores" role="alert" hidden></div>
+
+    <div class="acciones">
+      <button id="descargar" class="boton boton--primario" type="button">Descargar</button>
+    </div>
+  </main>
+
+  <div id="porton" class="porton" role="dialog" aria-modal="true" aria-labelledby="portonTitulo">
+    <div class="porton__tarjeta">
+      <div class="porton__marca"><img class="porton__logo" src="../assets/img/logo-nav-color.png" alt="CLARILIUM"></div>
+      <div class="porton__cuerpo">
+        <h2 id="portonTitulo">Estimaciones</h2>
+        <div id="portonGirando" class="girando" role="status" aria-label="Verificando tu sesión"></div>
+        <p id="portonMensaje" hidden>Entra con tu cuenta de CLARILIUM (@clarilium.com).</p>
+        <button id="entrar" class="boton boton--primario" type="button" hidden>Iniciar sesión con Microsoft</button>
+        <div id="portonError" class="porton__error" hidden></div>
+        <button id="reintentar" class="boton boton--secundario" type="button" hidden>Reintentar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../assets/js/vendor/jspdf.umd.min.js" defer></script>
+  <script src="../assets/js/vendor/msal-browser.min.js" defer></script>
+  <script src="../assets/js/portal-auth.js" defer></script>
+  <script src="../assets/js/estimacion-logos.js" defer></script>
+  <script src="../assets/js/estimacion.js" defer></script>
+</body>
+</html>
