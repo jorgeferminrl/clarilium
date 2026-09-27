@@ -1,0 +1,74 @@
+/* Estilos comunes del portal interno · /portal y todas sus paginas
+   Sin estilos en linea: la politica de contenido del sitio no los admite. */
+:root {
+  --cl-noche: #040814;
+  --cl-violeta: #9a36ff;
+  --cl-violeta-claro: #b469ff;
+  --cl-azul: #2493ed;
+  --cl-gris: #d1d2d4;
+  --cl-texto: #0a1020;
+  --cl-tenue: #667085;
+  --peligro: #b42318;
+  font-family: Lato, Roboto, "Segoe UI", Arial, sans-serif;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: #f4f6fb; color: var(--cl-texto); font-size: 16px; line-height: 1.45; }
+button, input, select { font: inherit; }
+[hidden] { display: none !important; }
+.solo-lector { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.demo-banner { background: #fff4d6; color: #7a5200; text-align: center; font-size: .85rem; padding: 6px 16px; }
+
+/* Barra superior */
+.barra { position: sticky; top: 0; z-index: 50; background: var(--cl-noche); color: #fff; }
+.barra__dentro { max-width: 1100px; margin: auto; padding: 12px 16px; display: flex; align-items: center; gap: 16px; }
+.barra__logo { height: 34px; width: auto; }
+.barra__titulo { font-weight: 700; letter-spacing: .02em; padding-left: 16px; border-left: 1px solid #2a3350; }
+.cuenta { margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: .9rem; }
+.cuenta__nombre { color: #d8dcea; }
+.cuenta__salir { background: transparent; color: #fff; border: 1px solid #3a4466; border-radius: 6px; padding: 4px 12px; cursor: pointer; }
+.cuenta__salir:hover { border-color: var(--cl-violeta-claro); color: var(--cl-violeta-claro); }
+
+.principal { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+
+.estado { font-size: .85rem; color: var(--cl-tenue); }
+.estado--error { color: var(--peligro); }
+
+.acciones { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.boton { border: 0; border-radius: 8px; padding: 11px 22px; font-weight: 700; cursor: pointer; }
+.boton--primario { background: var(--cl-violeta); color: #fff; }
+.boton--primario:hover { background: #8a2cf0; }
+.boton--secundario { background: var(--cl-noche); color: #fff; }
+.boton--secundario:hover { background: #18243a; }
+.boton:disabled { opacity: .55; cursor: wait; }
+
+/* Porton de inicio de sesion (mismo aspecto que el TimeSheet) */
+.porton { position: fixed; inset: 0; z-index: 999; display: flex; align-items: center; justify-content: center; padding: 24px; background: #f4f6fb; }
+.porton--oculto { display: none; }
+.porton__tarjeta { width: 100%; max-width: 420px; background: #fff; border-radius: 14px; overflow: hidden; text-align: center; box-shadow: 0 18px 48px rgba(4, 8, 20, .22); }
+.porton__marca { background: var(--cl-noche); padding: 26px 24px; }
+.porton__logo { width: 210px; max-width: 78%; height: auto; display: block; margin: 0 auto; }
+.porton__cuerpo { padding: 28px 32px 32px; }
+.porton__cuerpo h2 { margin: 0 0 10px; font-size: 1.25rem; color: var(--cl-noche); }
+.porton__cuerpo p { margin: 0 0 22px; font-size: .92rem; color: #4a5568; }
+.porton__error { margin-top: 18px; padding: 12px 14px; border-radius: 8px; background: #fdecec; color: #8c1c1c; font-size: .85rem; text-align: left; }
+.porton__error + .boton { margin-top: 16px; }
+.girando { width: 34px; height: 34px; margin: 8px auto; border: 4px solid #e3e5ea; border-top-color: var(--cl-violeta); border-radius: 50%; animation: girar .8s linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
+
+/* Pagina principal del portal: tarjetas de herramientas */
+.portal__titulo { margin: 0 0 6px; font-size: 1.5rem; color: var(--cl-noche); }
+.portal__intro { margin: 0 0 24px; color: var(--cl-tenue); }
+.herramientas { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.herramienta { display: block; padding: 20px 22px; background: #fff; border: 1px solid #e3e5ea; border-left: 4px solid var(--cl-violeta); border-radius: 10px; color: var(--cl-texto); text-decoration: none; box-shadow: 0 6px 18px rgba(4, 8, 20, .06); }
+.herramienta:hover { border-left-color: var(--cl-azul); transform: translateY(-2px); }
+.herramienta__nombre { display: block; font-weight: 700; font-size: 1.1rem; color: var(--cl-noche); }
+.herramienta__desc { display: block; margin-top: 6px; font-size: .9rem; color: var(--cl-tenue); }
+.barra__volver { color: #d8dcea; text-decoration: none; font-size: .9rem; }
+.barra__volver:hover { color: var(--cl-violeta-claro); }
+
+@media (max-width: 720px) {
+  .barra__titulo { display: none; }
+}
