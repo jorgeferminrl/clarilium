@@ -361,3 +361,7 @@ body.dark .diag pre{background:#040814;color:#cfe0ff;}
 .lang-button svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
 @media (max-width:600px){ .lang-button{width:auto;padding:0 9px;gap:4px;} }
 @media (max-width:380px){ .lang-button svg{display:none;} .brand__logo{width:100px;} }
+
+/* Con el boton de idioma, la barra trae mas elementos: por debajo de 1440px
+   el titulo centrado chocaba con "En vivo" y la cuenta, asi que se oculta. */
+@media (max-width:1440px){ .topbar__title{display:none;} }
