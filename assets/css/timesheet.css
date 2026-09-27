@@ -1,4 +1,4 @@
-:root{--timesheet-version:"2026.09.26-1";}
+:root{--timesheet-version:"2026.09.27-1";}
 :root {
   --clarilium-night: #040814;
   --clarilium-navy: #0D1728;
@@ -185,7 +185,7 @@ body.dark .alert--warning { color: #ffd77b; background: #3b2a05; border-color: #
 .skeleton::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); animation: shimmer 1.2s infinite; }
 @keyframes shimmer { to { transform: translateX(100%); } }
 
-@media (max-width: 1240px) {
+@media (max-width: 1360px) {
   .filters-grid { grid-template-columns: repeat(4, minmax(130px, 1fr)); }
 }
 
@@ -354,3 +354,10 @@ body.dark .diag pre{background:#040814;color:#cfe0ff;}
 /* label trae display:grid, que le gana al atributo hidden de data-solo-admin. */
 .consultant-focus__control[hidden] { display: none; }
 .consultant-focus .kpi-grid { margin-bottom: 0; }
+
+/* Boton de idioma: el mismo del sitio (globo + idioma al que se cambia).
+   Idioma y tema los maneja preferencias.js, comun a todo el sitio. */
+.lang-button{width:auto;min-width:42px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;font-size:.85rem;font-weight:700;letter-spacing:.04em;}
+.lang-button svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+@media (max-width:600px){ .lang-button{width:auto;padding:0 9px;gap:4px;} }
+@media (max-width:380px){ .lang-button svg{display:none;} .brand__logo{width:100px;} }
