@@ -8,10 +8,10 @@
 
 // Requiere assets/js/portal-auth.js (sesion, Graph y porton comunes del portal).
 const APP = {
-  // Se pide aparte: si el permiso aun no esta concedido, la pagina sigue
-  // funcionando y "Estimado por" muestra solo a quien inicio sesion.
-  scopesUsuarios: ["User.ReadBasic.All"],
   listaClientes: "Clientes",
+  // "Estimado por" se llena con la columna Consultor de la lista Consultores.
+  listaConsultores: "Consultores",
+  columnaConsultor: "Consultor",
   formatoDefault: "CLARILIUM"
 };
 
@@ -36,50 +36,50 @@ const TAREAS = [
 
 // Colores de cada formato para el PDF (los de pantalla estan en estimacion.css).
 const TEMAS = {
-  clarilium: { logo: "clarilium", oscuro: "#040814", oscuroTexto: "#FFFFFF", seccion: "#9A36FF", seccionTexto: "#FFFFFF",
-               tarea: "#0C193E", resumen: "#667085", borde: "#C9CCD4", marco: "#040814", acento: "#2493ED", total: "#B469FF", italica: false },
-  dxgrow:    { logo: "dxgrow", oscuro: "#1E1E1E", oscuroTexto: "#FFFFFF", seccion: "#A6A6A6", seccionTexto: "#FFFFFF",
-               tarea: "#7F7F7F", resumen: "#8C8C8C", borde: "#1E1E1E", marco: "#1E1E1E", acento: null, total: "#FFFFFF", italica: true }
+  clarilium: { logo: "clarilium", oscuro: "#040814", oscuroTexto: "#FFFFFF", seccion: "#9A36FF", seccionTexto: "#040814",
+               tarea: "#0C193E", resumen: "#667085", borde: "#C9CCD4", marco: "#040814", acento: "#B469FF", acentoCab: "#9A36FF", total: "#B469FF", italica: false },
+  dxgrow:    { logo: "dxgrow", oscuro: "#1E1E1E", oscuroTexto: "#FFFFFF", seccion: "#B5C934", seccionTexto: "#1E1E1E",
+               tarea: "#7F7F7F", resumen: "#8C8C8C", borde: "#1E1E1E", marco: "#1E1E1E", acento: "#B5C934", acentoCab: "#B5C934", total: "#FFFFFF", italica: true }
 };
 // Solo Dxgrow tiene formato propio; cualquier otro cliente usa el de CLARILIUM.
 const temaDe = formato => norm(formato).includes("dxgrow") ? "dxgrow" : "clarilium";
 
 /* ------------------------------------------------------------------ *
- * Datos: clientes (lista Clientes) y usuarios del tenant
+ * Datos: listas Clientes y Consultores del sitio timesheet
  * ------------------------------------------------------------------ */
-async function leerClientes(token) {
+async function leerCatalogos(token) {
   const g = PORTAL.graph;
   const sitio = await graphGet(`${g.base}/sites/${g.hostname}:${g.sitePath}?$select=id`, token);
   const listas = await graphTodo(`${g.base}/sites/${sitio.id}/lists?$select=id,name,displayName&$top=200`, token);
-  const lista = listas.find(l => norm(l.displayName) === norm(APP.listaClientes) || norm(l.name) === norm(APP.listaClientes));
-  if (!lista) throw new Error(`Falta la lista “${APP.listaClientes}” en el sitio de SharePoint.`);
-  const columnas = await graphTodo(`${g.base}/sites/${sitio.id}/lists/${lista.id}/columns?$select=name,displayName&$top=200`, token);
-  const interno = visible => (columnas.find(c => norm(c.displayName) === norm(visible)) || columnas.find(c => norm(c.name) === norm(visible)))?.name;
-  const colCliente = interno("Cliente");
-  const colSub = interno("Subcliente");
-  if (!colSub) throw new Error("La lista Clientes no tiene la columna “Subcliente”.");
-  const items = await graphTodo(`${g.base}/sites/${sitio.id}/lists/${lista.id}/items?$expand=fields&$top=500`, token);
-  const texto = v => (v && typeof v === "object") ? (v.LookupValue ?? v.lookupValue ?? v.Label ?? "") : v;
-  return {
-    subclientes: unicos(items.map(i => texto(i.fields?.[colSub]))),
-    clientes: colCliente ? unicos(items.map(i => texto(i.fields?.[colCliente]))) : []
-  };
-}
+  const texto = v => (v && typeof v === "object") ? (v.LookupValue ?? v.lookupValue ?? v.Label ?? v.DisplayName ?? "") : v;
 
-async function leerUsuarios() {
-  const token = await auth.token(APP.scopesUsuarios, false);
-  const url = `${PORTAL.graph.base}/users?$select=displayName,userPrincipalName&$top=999`;
-  const usuarios = await graphTodo(url, token);
-  return unicos(usuarios
-    .filter(u => { const p = norm(u.userPrincipalName); return p.endsWith(PORTAL.dominio) && !p.includes("#ext#"); })
-    .map(u => u.displayName));
+  // Devuelve, por cada columna pedida (nombre visible), sus valores sin repetir.
+  async function leer(nombreLista, columnasVisibles) {
+    const lista = listas.find(l => norm(l.displayName) === norm(nombreLista) || norm(l.name) === norm(nombreLista));
+    if (!lista) throw new Error(`Falta la lista “${nombreLista}” en el sitio de SharePoint.`);
+    const columnas = await graphTodo(`${g.base}/sites/${sitio.id}/lists/${lista.id}/columns?$select=name,displayName&$top=200`, token);
+    const interno = visible => (columnas.find(c => norm(c.displayName) === norm(visible)) || columnas.find(c => norm(c.name) === norm(visible)))?.name;
+    const items = await graphTodo(`${g.base}/sites/${sitio.id}/lists/${lista.id}/items?$expand=fields&$top=500`, token);
+    return columnasVisibles.map(visible => {
+      const col = interno(visible);
+      return col ? unicos(items.map(i => texto(i.fields?.[col]))) : null;
+    });
+  }
+
+  const [[subclientes, clientes], [consultores]] = await Promise.all([
+    leer(APP.listaClientes, ["Subcliente", "Cliente"]),
+    leer(APP.listaConsultores, [APP.columnaConsultor])
+  ]);
+  if (!subclientes) throw new Error("La lista Clientes no tiene la columna “Subcliente”.");
+  if (!consultores) throw new Error(`La lista ${APP.listaConsultores} no tiene la columna “${APP.columnaConsultor}”.`);
+  return { subclientes, clientes: clientes || [], consultores };
 }
 
 const DEMO = {
   yo: "Usuario Demo",
   subclientes: ["Mobility ADO", "Cliente Ejemplo Norte", "Cliente Ejemplo Sur"],
   clientes: ["Dxgrow", "CLARILIUM", "Cliente Ejemplo"],
-  usuarios: ["Usuario Demo", "Consultor Ejemplo Uno", "Consultor Ejemplo Dos"]
+  consultores: ["Usuario Demo", "Consultor Ejemplo Uno", "Consultor Ejemplo Dos"]
 };
 
 /* ------------------------------------------------------------------ *
@@ -175,8 +175,15 @@ function validar() {
   marcar("estimadoPor", Boolean(d.estimadoPor), "Estimado por es obligatorio.");
   TAREAS.forEach(t => {
     const v = $(t.id).value;
-    marcar(t.id, v === "" || RE_HORAS.test(v), `${t.nombre}: hasta 4 enteros sin ceros a la izquierda y un decimal.`);
+    if (v !== "" && !RE_HORAS.test(v)) marcar(t.id, false, `${t.nombre}: hasta 4 enteros sin ceros a la izquierda y un decimal.`);
+    // Solo se admiten medias horas: 1.0, 1.5, 10.5… (no 3.1, 5.4, 6.9…).
+    else if (decimas(v) % 5 !== 0) marcar(t.id, false, `${t.nombre}: las horas deben ir en múltiplos de 0.5 (por ejemplo 1.0, 1.5 o 10.5).`);
+    else marcar(t.id, true, "");
   });
+  if (d.total === 0 && TAREAS.every(t => $(t.id).value === "" || RE_HORAS.test($(t.id).value))) {
+    TAREAS.forEach(t => $(t.id).classList.add("invalido"));
+    errores.push("Debes cargar al menos una actividad con 0.5 horas o más en la columna Esfuerzo (Horas).");
+  }
   const caja = $("errores");
   if (errores.length) {
     caja.replaceChildren(document.createTextNode("Revisa los campos marcados:"));
@@ -203,13 +210,15 @@ function generarPDF(d) {
   if (!window.jspdf?.jsPDF) throw new Error("No se pudo cargar la biblioteca para crear el PDF. Recarga la página.");
   const T = TEMAS[temaDe(d.formato)];
   const doc = new window.jspdf.jsPDF({ unit: "mm", format: "letter", orientation: "portrait" });
-  const est = base => T.italica ? (base === "normal" ? "italic" : "bolditalic") : base;
+  const est = base => base.includes("italic") ? base : T.italica ? (base === "normal" ? "italic" : "bolditalic") : base;
   const X = 12, W = doc.internal.pageSize.getWidth() - 24;
   const c1 = W * 0.25, c2 = W * 0.30, c3 = W - c1 - c2;
   let y = 14;
 
+  // En las zonas oscuras las columnas y renglones se separan con lineas blancas.
+  const BLANCO = "#FFFFFF";
   const celda = (x, yy, w, h, relleno, borde = T.borde) => {
-    doc.setDrawColor(borde); doc.setLineWidth(0.25);
+    doc.setDrawColor(borde); doc.setLineWidth(borde === BLANCO ? 0.35 : 0.25);
     if (relleno) { doc.setFillColor(relleno); doc.rect(x, yy, w, h, "FD"); } else doc.rect(x, yy, w, h, "S");
   };
   const texto = (t, x, yy, { tam = 9, estilo = "normal", color = "#000000", alinear = "left" } = {}) => {
@@ -234,13 +243,17 @@ function generarPDF(d) {
   if (T.acento) { doc.setFillColor(T.acento); doc.rect(X, y, W, 1, "F"); y += 1; }
 
   // Datos del requerimiento: etiqueta | valor | etiqueta | valor
-  const a1 = W * 0.25, a2 = W * 0.27, a3 = W * 0.13, a4 = W - a1 - a2 - a3;
+  // Mismas columnas que la tabla: el valor termina y la segunda etiqueta empieza
+  // exactamente en la linea de columna (25 % y 55 %).
+  const a1 = c1, a2 = c2, a3 = W * 0.13, a4 = W - a1 - a2 - a3;
   const filaDatos = (et1, v1, et2, v2) => {
     doc.setFont("helvetica", est("normal")); doc.setFontSize(9);
     const l1 = doc.splitTextToSize(v1, a2 - 4), l2 = doc.splitTextToSize(v2, a4 - 4);
     const h = Math.max(7, Math.max(l1.length, l2.length) * 3.8 + 3.2);
-    celda(X, y, a1, h, T.oscuro); celda(X + a1 + a2, y, a3, h, T.oscuro);
-    celda(X + a1, y, a2, h, "#FFFFFF"); celda(X + a1 + a2 + a3, y, a4, h, "#FFFFFF");
+    doc.setFillColor(T.oscuro); doc.rect(X, y, W, h, "F");
+    doc.setFillColor("#FFFFFF");
+    doc.rect(X + a1, y + 0.8, a2, h - 1.6, "F");
+    doc.rect(X + a1 + a2 + a3, y + 0.8, a4, h - 1.6, "F");
     texto(et1, X + a1 - 2.5, y + h / 2, { estilo: "bold", color: T.oscuroTexto, alinear: "right" });
     texto(et2, X + a1 + a2 + a3 - 2.5, y + h / 2, { estilo: "bold", color: T.oscuroTexto, alinear: "right" });
     const centrado = (lineas, cx) => lineas.forEach((l, i) => texto(l, cx, y + h / 2 + (i - (lineas.length - 1) / 2) * 3.8, { alinear: "center" }));
@@ -250,19 +263,16 @@ function generarPDF(d) {
   filaDatos("ID Requerimiento:", d.id, "Descripción", d.descripcion);
   filaDatos("Cliente", d.cliente, "Estimado por", d.estimadoPor);
 
+  // Linea de acento antes de los encabezados de la tabla
+  if (T.acentoCab) { doc.setFillColor(T.acentoCab); doc.rect(X, y, W, 1, "F"); y += 1; }
+
   // Encabezado de la tabla
   const hCab = 7;
-  [[X, c1, "Tareas / Entregables"], [X + c1, c2, "Resumen de la funcionalidad"], [X + c1 + c2, c3, "Esfuerzo ( Horas )"]].forEach(([x, w, t]) => {
-    celda(x, y, w, hCab, T.oscuro);
-    texto(t, x + w / 2, y + hCab / 2, { tam: 9.5, estilo: "bold", color: T.oscuroTexto, alinear: "center" });
+  [[X, c1, "Tareas / Entregables"], [X + c1, c2, "Resumen de la funcionalidad"], [X + c1 + c2, c3, "Esfuerzo (Horas)"]].forEach(([x, w, t]) => {
+    celda(x, y, w, hCab, T.seccion, T.acentoCab || BLANCO);
+    texto(t, x + w / 2, y + hCab / 2, { tam: 9.5, estilo: "bolditalic", color: T.seccionTexto, alinear: "center" });
   });
   y += hCab;
-
-  // Seccion
-  const hSec = 6.5;
-  celda(X, y, c1 + c2, hSec, T.seccion); celda(X + c1 + c2, y, c3, hSec, T.seccion);
-  texto("Análisis y Estimación ABAP", X + 2.5, y + hSec / 2, { tam: 9.5, estilo: "bold", color: T.seccionTexto });
-  y += hSec;
 
   // Tareas
   TAREAS.forEach(t => {
@@ -280,7 +290,8 @@ function generarPDF(d) {
 
   // Total
   const hTot = 7.5;
-  celda(X, y, c1 + c2, hTot, T.oscuro); celda(X + c1 + c2, y, c3, hTot, T.oscuro);
+  // Total en una sola franja oscura, sin lineas divisorias.
+  doc.setFillColor(T.oscuro); doc.rect(X, y, W, hTot, "F");
   texto("Total del esfuerzo:", X + c1 + c2 - 3, y + hTot / 2, { tam: 10, estilo: "bold", color: T.oscuroTexto, alinear: "right" });
   texto(fmtHoras(d.total), X + W - 3, y + hTot / 2, { tam: 10.5, estilo: "bold", color: T.total, alinear: "right" });
   y += hTot;
@@ -299,22 +310,7 @@ async function descargar() {
   let blob;
   try { blob = generarPDF(d); } catch (error) { mostrarError(error.message); return; }
   const nombre = nombreArchivo(d);
-  // Cuadro "Guardar como" con el nombre propuesto (Edge y Chrome).
-  if (window.showSaveFilePicker) {
-    try {
-      const archivo = await window.showSaveFilePicker({
-        suggestedName: nombre,
-        types: [{ description: "Documento PDF", accept: { "application/pdf": [".pdf"] } }]
-      });
-      const escritor = await archivo.createWritable();
-      await escritor.write(blob);
-      await escritor.close();
-      return;
-    } catch (error) {
-      if (error?.name === "AbortError") return;   // el usuario cancelo
-    }
-  }
-  // Respaldo para navegadores sin ese cuadro: descarga con el mismo nombre.
+  // Descarga directa a la carpeta de descargas del navegador, con el nombre propuesto.
   const url = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement("a"), { href: url, download: nombre });
   document.body.append(a); a.click(); a.remove();
@@ -336,6 +332,14 @@ function enlazar() {
   ["cliente", "estimadoPor"].forEach(id => $(id).addEventListener("change", e => e.target.classList.remove("invalido")));
   TAREAS.forEach(t => {
     const input = $(t.id);
+    // Un clic en cualquier punto de la celda activa el campo.
+    input.closest("td").addEventListener("mousedown", e => {
+      if (e.target === input) return;
+      e.preventDefault();
+      input.focus();
+      const fin = input.value.length;
+      input.setSelectionRange(fin, fin);
+    });
     input.addEventListener("input", () => { reemplazarValor(input, limpiarHoras(input.value)); input.classList.remove("invalido"); actualizarTotal(); });
     input.addEventListener("blur", () => {
       if (input.value.endsWith(".")) input.value = input.value.slice(0, -1);
@@ -357,21 +361,18 @@ function enlazar() {
  * Arranque
  * ------------------------------------------------------------------ */
 async function cargarDatosReales() {
-  estado("Cargando clientes y usuarios…");
+  estado("Cargando clientes y consultores…");
   const token = await auth.token();
   const yo = (await graphGet(`${PORTAL.graph.base}/me?$select=displayName`, token)).displayName || auth.account.name || "";
   $("cuentaNombre").textContent = yo;
 
-  let usuarios = [yo];
-  let aviso = "";
-  try { usuarios = unicos([yo, ...(await leerUsuarios())]); }
-  catch { aviso = "No se pudo leer el directorio de usuarios; “Estimado por” muestra solo tu nombre."; }
-  llenarSelect($("estimadoPor"), usuarios, { elegido: yo });
-
-  const { subclientes, clientes } = await leerClientes(token);
+  const { subclientes, clientes, consultores } = await leerCatalogos(token);
+  // Por defecto, quien inicio sesion, si aparece en la lista Consultores.
+  const yoConsultor = consultores.find(c => norm(c) === norm(yo)) || "";
+  llenarSelect($("estimadoPor"), consultores, { elegido: yoConsultor });
   llenarSelect($("cliente"), subclientes);
   llenarFormatos(clientes);
-  estado(aviso, Boolean(aviso));
+  estado(yoConsultor ? "" : `Tu nombre (${yo}) no aparece en la lista Consultores; elige en “Estimado por” quién estima.`, !yoConsultor);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -382,7 +383,7 @@ document.addEventListener("DOMContentLoaded", () => {
   iniciarPortal({
     alDemo: () => {
       llenarSelect($("cliente"), DEMO.subclientes);
-      llenarSelect($("estimadoPor"), DEMO.usuarios, { elegido: DEMO.yo });
+      llenarSelect($("estimadoPor"), DEMO.consultores, { elegido: DEMO.yo });
       llenarFormatos(DEMO.clientes);
     },
     alEntrar: () => cargarDatosReales().catch(error => estado(error.message, true)),

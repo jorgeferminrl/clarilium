@@ -5,12 +5,13 @@ body.fmt-clarilium {
   --h-oscuro: #040814;
   --h-oscuro-texto: #ffffff;
   --h-seccion: #9a36ff;
-  --h-seccion-texto: #ffffff;
+  --h-seccion-texto: #040814;
   --h-tarea: #0c193e;
   --h-resumen: #667085;
   --h-borde: #c9ccd4;
   --h-marco: #040814;
-  --h-acento: #2493ed;
+  --h-acento: #b469ff;
+  --h-acento-cab: #9a36ff;
   --h-total: #b469ff;
   --h-letra: Lato, Roboto, "Segoe UI", Arial, sans-serif;
   --h-estilo: normal;
@@ -18,13 +19,14 @@ body.fmt-clarilium {
 body.fmt-dxgrow {
   --h-oscuro: #1e1e1e;
   --h-oscuro-texto: #ffffff;
-  --h-seccion: #a6a6a6;
-  --h-seccion-texto: #ffffff;
+  --h-seccion: #b5c934;
+  --h-seccion-texto: #1e1e1e;
   --h-tarea: #7f7f7f;
   --h-resumen: #8c8c8c;
   --h-borde: #1e1e1e;
   --h-marco: #1e1e1e;
-  --h-acento: #1e1e1e;
+  --h-acento: #b5c934;
+  --h-acento-cab: #b5c934;
   --h-total: #ffffff;
   --h-letra: Calibri, Carlito, "Segoe UI", Arial, sans-serif;
   --h-estilo: italic;
@@ -41,28 +43,35 @@ body.fmt-dxgrow {
 body.fmt-clarilium .hoja__logo { height: 40px; }
 .hoja__titulo { flex: 1; margin: 0; padding-left: 16px; text-align: center; font-size: 1.6rem; font-weight: 700; font-style: var(--h-estilo); }
 
-.hoja__datos { display: grid; grid-template-columns: 25% 27% 13% 35%; background: var(--h-oscuro); border-bottom: 1px solid var(--h-borde); }
+/* Zonas oscuras: columnas y renglones separados con lineas blancas */
+/* Mismas columnas que la tabla (25 / 30 / 45): el valor termina y la segunda etiqueta empieza en la linea de columna.
+   Sin lineas blancas entre los renglones. */
+.hoja__datos { display: grid; grid-template-columns: 25fr 30fr 13fr 32fr; gap: 0; background: var(--h-oscuro); }
 .hoja__datos .et { padding: 6px 10px; color: var(--h-oscuro-texto); font-weight: 700; font-style: var(--h-estilo); text-align: right; display: flex; align-items: center; justify-content: flex-end; white-space: nowrap; }
-.hoja__datos .val { padding: 3px 4px; }
+.hoja__datos .et, .hoja__datos .val { background: var(--h-oscuro); }
+.hoja__datos .val { padding: 3px 0; }
 .hoja__datos input, .hoja__datos select { width: 100%; padding: 4px 8px; border: 2px solid transparent; border-radius: 0; background: #fff; color: #111; text-align: center; font-family: inherit; }
 .req { color: var(--cl-violeta-claro); margin-left: 3px; }
 body.fmt-dxgrow .req { color: #b5c934; }
 
-.hoja__tabla { width: 100%; min-width: 640px; border-collapse: collapse; }
+.hoja__tabla { width: 100%; min-width: 640px; border-collapse: collapse; table-layout: fixed; }
 .hoja__tabla .c1 { width: 25%; }
 .hoja__tabla .c2 { width: 30%; }
 .hoja__tabla .c3 { width: 45%; }
-.hoja__tabla thead th { background: var(--h-oscuro); color: var(--h-oscuro-texto); font-weight: 700; font-style: var(--h-estilo); padding: 6px 8px; border: 1px solid var(--h-borde); }
-.hoja__tabla .seccion th { background: var(--h-seccion); color: var(--h-seccion-texto); text-align: left; font-style: var(--h-estilo); padding: 5px 8px; border: 1px solid var(--h-borde); }
-.hoja__tabla .seccion td { background: var(--h-seccion); border: 1px solid var(--h-borde); }
+.hoja__tabla thead th { background: var(--h-seccion); color: var(--h-seccion-texto); font-weight: 700; font-style: italic; padding: 6px 8px; border: 1px solid var(--h-acento-cab); border-top: 3px solid var(--h-acento-cab); }
 .hoja__tabla .fila th { color: var(--h-tarea); font-weight: 700; font-style: var(--h-estilo); text-align: left; padding: 10px 14px; border: 1px solid var(--h-borde); }
 .hoja__tabla .resumen { color: var(--h-resumen); font-style: var(--h-estilo); font-size: .88rem; padding: 6px 8px; border: 1px solid var(--h-borde); vertical-align: top; }
-.hoja__tabla .horas { padding: 4px; border: 1px solid var(--h-borde); vertical-align: bottom; }
+/* Toda la celda de horas es editable: un clic en cualquier punto la activa. */
+.hoja__tabla .horas { padding: 0; border: 1px solid var(--h-borde); vertical-align: bottom; cursor: text; background: #fff; }
+.hoja__tabla .horas:focus-within { box-shadow: inset 0 0 0 2px var(--cl-azul); }
+.hoja__tabla .horas:has(.invalido) { background: #fff5f5; box-shadow: inset 0 0 0 2px var(--peligro); }
 .fila--alta { height: 150px; }
-.h { width: 100%; height: 100%; min-height: 38px; padding: 6px 10px; border: 2px solid #e3e5ea; background: #fff; text-align: right; font-weight: 700; color: #111; font-family: inherit; }
-.h:focus, .hoja__datos input:focus, .hoja__datos select:focus { outline: none; border-color: var(--cl-azul); }
-.hoja__tabla .total th { background: var(--h-oscuro); color: var(--h-oscuro-texto); text-align: right; font-style: var(--h-estilo); padding: 6px 10px; border: 1px solid var(--h-borde); }
-.hoja__tabla .total td { background: var(--h-oscuro); color: var(--h-total); text-align: right; font-weight: 700; font-style: var(--h-estilo); padding: 6px 10px; border: 1px solid var(--h-borde); }
+.h { display: block; width: 100%; min-height: 42px; padding: 6px 12px; border: 0; background: transparent; text-align: right; font-weight: 700; color: #111; font-family: inherit; cursor: text; }
+.h.invalido { border: 0; background: transparent !important; }
+.h:focus { outline: none; }
+.hoja__datos input:focus, .hoja__datos select:focus { outline: none; border-color: var(--cl-azul); }
+.hoja__tabla .total th { background: var(--h-oscuro); color: var(--h-oscuro-texto); text-align: right; font-style: var(--h-estilo); padding: 6px 10px; border: 1px solid var(--h-oscuro); }
+.hoja__tabla .total td { background: var(--h-oscuro); color: var(--h-total); text-align: right; font-weight: 700; font-style: var(--h-estilo); padding: 6px 10px; border: 1px solid var(--h-oscuro); }
 .total output { display: block; padding: 2px 8px; }
 
 .invalido { border-color: var(--peligro) !important; background: #fff5f5 !important; }
