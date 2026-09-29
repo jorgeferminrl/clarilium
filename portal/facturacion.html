@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#040814">
+  <meta name="description" content="Portal de facturación de CLARILIUM: envío de facturas de colaboradores.">
+  <title data-en="Billing · CLARILIUM">Facturación · CLARILIUM</title>
+  <link rel="icon" href="../assets/img/favicon-32.png" sizes="32x32">
+  <link rel="stylesheet" href="../assets/css/portal-inicio.css">
+  <link rel="stylesheet" href="../assets/css/facturacion.css">
+</head>
+<body class="facturacion">
+  <script src="../assets/js/preferencias.js"></script>
+  <a class="skip-link" href="#main" data-en="Skip to content">Saltar al contenido</a>
+  <div id="demoBanner" class="demo-banner" hidden data-en="DEMO MODE · the file checks work, but nothing is sent. Invoices are sent only from the published page.">MODO DEMO · las validaciones funcionan, pero no se envía nada. Las facturas solo se envían desde la página publicada.</div>
+
+  <header class="topbar">
+    <div class="topbar__inner">
+      <span class="brand"><img class="brand__logo" src="../assets/img/logo-portal.png" alt="CLARILIUM — Ideas claras, soluciones claras" data-en-alt="CLARILIUM — Clear ideas, clear solutions"></span>
+      <div class="topbar__actions">
+        <span id="cuenta" class="account-chip" hidden><span id="cuentaNombre" class="account-chip__name"></span><button id="salir" class="account-chip__out" type="button" data-en="Sign out">Salir</button></span>
+        <button class="icon-button lang-button" type="button" data-accion="idioma" aria-label="Cambiar a inglés" title="Switch to English"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.5 9h17M3.5 15h17"/><path d="M12 3c2.3 2.4 3.4 5.4 3.4 9s-1.1 6.6-3.4 9c-2.3-2.4-3.4-5.4-3.4-9S9.7 5.4 12 3Z"/></svg><span data-idioma-destino>EN</span></button>
+        <button id="themeToggle" class="icon-button" type="button" data-accion="tema" aria-label="Cambiar entre modo claro y oscuro">◐</button>
+      </div>
+    </div>
+    <div class="identity-strip" aria-hidden="true"></div>
+  </header>
+
+  <!-- Porton de acceso. Visible desde el HTML: nadie ve el formulario antes de
+       que portal-auth.js confirme una cuenta @clarilium.com. -->
+  <div id="porton" class="porton" role="dialog" aria-modal="true" aria-labelledby="portonTitulo">
+    <div class="porton__tarjeta">
+      <div class="porton__marca"><img class="porton__logo" src="../assets/img/logo-nav-color.png" alt="CLARILIUM"></div>
+      <div class="porton__cuerpo">
+        <h2 id="portonTitulo" data-en="Billing">Facturación</h2>
+        <div id="portonGirando" class="girando" role="status" aria-label="Verificando tu sesión" data-en-aria-label="Checking your session"></div>
+        <p id="portonMensaje" hidden data-en="Sign in with your CLARILIUM account (@clarilium.com).">Inicia sesión con tu cuenta de CLARILIUM (@clarilium.com).</p>
+        <button id="entrar" class="porton__btn" type="button" hidden data-en="Sign in with Microsoft">Iniciar sesión con Microsoft</button>
+        <div id="portonError" class="porton__error" hidden></div>
+        <button id="reintentar" class="porton__btn" type="button" hidden data-en="Try again">Reintentar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="principal" class="fac" hidden>
+    <main id="main" class="fac__main" tabindex="-1">
+      <div class="fac__encabezado">
+        <h1 data-en="Billing">Facturación</h1>
+        <p data-en="Send your invoice (XML and PDF) together with the details of the service provided.">Envía tu factura (XML y PDF) junto con los datos del servicio prestado.</p>
+      </div>
+
+      <form id="forma" class="fac__forma" novalidate autocomplete="off">
+        <div class="fac__rejilla">
+          <label class="fac__campo" for="nombre"><span><span data-en="First name">Nombre</span> <span class="req" aria-hidden="true">*</span></span>
+            <input id="nombre" name="nombre" type="text" maxlength="60" required placeholder="Nombre" data-en-placeholder="First name" autocomplete="given-name">
+          </label>
+          <label class="fac__campo" for="apellido"><span><span data-en="Last name">Apellido</span> <span class="req" aria-hidden="true">*</span></span>
+            <input id="apellido" name="apellido" type="text" maxlength="60" required placeholder="Apellido" data-en-placeholder="Last name" autocomplete="family-name">
+          </label>
+          <label class="fac__campo" for="tipoServicio"><span><span data-en="Type of service">Tipo de servicio</span> <span class="req" aria-hidden="true">*</span></span>
+            <input id="tipoServicio" name="tipoServicio" type="text" maxlength="120" required placeholder="Tipo de servicio" data-en-placeholder="Type of service">
+          </label>
+          <label class="fac__campo" for="contacto"><span><span data-en="Contact who requested the service">Contacto que solicitó el servicio</span> <span class="req" aria-hidden="true">*</span></span>
+            <input id="contacto" name="contacto" type="text" maxlength="120" required placeholder="Nombre del contacto" data-en-placeholder="Contact name">
+          </label>
+        </div>
+
+        <div class="fac__rejilla fac__rejilla--archivos">
+          <div class="fac__campo">
+            <span id="etqXml"><span data-en="XML upload">Carga de XML</span> <span class="req" aria-hidden="true">*</span></span>
+            <label id="zonaXml" class="zona" for="archivoXml" data-tipo="xml">
+              <svg class="zona__icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4"/><path d="M7 9l5-5 5 5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+              <span class="zona__texto"><span data-en="Drag your file or">Arrastra tu archivo o</span> <span class="zona__enlace" data-en="choose a file">elige un archivo</span></span>
+              <span class="zona__ayuda" data-en="Only .xml (CFDI 4.0)">Solo .xml (CFDI 4.0)</span>
+              <span class="zona__archivo" hidden><span class="zona__nombre"></span><span class="zona__estado"></span></span>
+              <input id="archivoXml" class="zona__input" type="file" accept=".xml,text/xml,application/xml" aria-labelledby="etqXml">
+            </label>
+            <button class="zona__quitar" type="button" data-quitar="xml" hidden data-en="Remove file">Quitar archivo</button>
+          </div>
+          <div class="fac__campo">
+            <span id="etqPdf"><span data-en="PDF upload">Carga de PDF</span> <span class="req" aria-hidden="true">*</span></span>
+            <label id="zonaPdf" class="zona" for="archivoPdf" data-tipo="pdf">
+              <svg class="zona__icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4"/><path d="M7 9l5-5 5 5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+              <span class="zona__texto"><span data-en="Drag your file or">Arrastra tu archivo o</span> <span class="zona__enlace" data-en="choose a file">elige un archivo</span></span>
+              <span class="zona__ayuda" data-en="Only .pdf">Solo .pdf</span>
+              <span class="zona__archivo" hidden><span class="zona__nombre"></span><span class="zona__estado"></span></span>
+              <input id="archivoPdf" class="zona__input" type="file" accept=".pdf,application/pdf" aria-labelledby="etqPdf">
+            </label>
+            <button class="zona__quitar" type="button" data-quitar="pdf" hidden data-en="Remove file">Quitar archivo</button>
+          </div>
+        </div>
+
+        <div id="mensajes" class="fac__mensajes" role="alert" aria-live="assertive" hidden></div>
+
+        <div class="fac__pie">
+          <span class="fac__nota"><span class="req" aria-hidden="true">*</span> <span data-en="Required fields">Campos obligatorios</span></span>
+          <button id="enviar" class="fac__boton" type="submit" data-en="Send invoice">Enviar factura</button>
+        </div>
+      </form>
+    </main>
+
+    <footer class="fac__footer">
+      <span>© <span id="anio">2026</span> CLARILIUM · <span data-en="Clear ideas, clear solutions">Ideas claras, soluciones claras</span></span>
+      <a href="https://www.clarilium.com" target="_blank" rel="noopener noreferrer">clarilium.com</a>
+    </footer>
+  </div>
+
+  <script src="../assets/js/vendor/msal-browser.min.js" defer></script>
+  <script src="../assets/js/portal-auth.js" defer></script>
+  <script src="../assets/js/facturacion.js" defer></script>
+</body>
+</html>
