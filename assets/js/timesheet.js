@@ -43,10 +43,10 @@ const APP = {
     nota: "Nota",
     asignadoA: "Asignado a"
   },
-  // Posibles nombres de la columna de nombre en cada catalogo, en orden de preferencia.
   // Columna de la lista Clientes que alimenta el desplegable "Formato" del
   // reporte mensual. Es la del cliente de primer nivel, no la del subcliente.
   formatColumn: "Cliente",
+  // Posibles nombres de la columna de nombre en cada catalogo, en orden de preferencia.
   catalogColumns: {
     clients: ["Subcliente", "Cliente", "Nombre del cliente", "Title"],
     consultants: ["Consultor", "Nombre y Apellido", "Nombre", "Title"]
@@ -91,7 +91,7 @@ const saved = readStorage();
 const state = {
   records: [], invalidRows: [], rawRows: [], catalogs: { clients: [], developers: [] }, warnings: [],
   sourceName: "SharePoint", isAdmin: false, me: null, loadedAt: null, syncStatus: "loading", syncError: "", refreshPromise: null, dataSignature: "", filters: {}, charts: {},
-  selectedClient: "", selectedConsultant: "", selectedConsultantClient: "", focusConsultant: "", approvalFormat: "CLARILIUM",
+  selectedClient: "", selectedConsultant: "", selectedConsultantClient: "", approvalFormat: "CLARILIUM",
   clientRates: Array.isArray(saved.clientRates) ? saved.clientRates : [],
   collabRates: Array.isArray(saved.collabRates) ? saved.collabRates : [],
   manualAssignments: saved.manualAssignments || {},
@@ -224,15 +224,26 @@ class GraphDataProvider extends DataProvider {
   // Valores unicos de una columna suelta de un catalogo. Se usa para el
   // desplegable "Formato": ahi no van los subclientes, va el cliente de primer
   // nivel, que es quien tiene identidad grafica propia.
-  async columnValues(siteId, byName, listKey, columnName) {
-    const list = byName.get(norm(APP.graph.lists[listKey]));
+  async columnValues(siteId, byName, listKey, columnName, warnings) {
+    const wanted = APP.graph.lists[listKey];
+    const list = byName.get(norm(wanted));
     if (!list) return [];
     const map = await this.columnMap(siteId, list.id);
     const internal = map.get(norm(columnName));
-    if (!internal) return [];
+    if (!internal) {
+      // Callarlo fue el error de la primera version: la lista salia vacia y no
+      // habia forma de saber si era por el nombre o por el contenido.
+      warnings?.push(L(`No se encontró la columna “${columnName}” en “${wanted}”.`, `The “${columnName}” column was not found in “${wanted}”.`));
+      return [];
+    }
     const items = await this.itemFields(siteId, list.id);
-    return unique(items.map(item => lookupText(item.fields?.[internal])))
+    const valores = unique(items.map(item => lookupText(item.fields?.[internal])))
       .sort((a, b) => a.localeCompare(b, "es"));
+    // Queda registrado para ?diagnostico=1: si no llega nada, esto dice si fallo
+    // el nombre de la columna o el contenido de los elementos.
+    state.diagColumna = { columna: columnName, interno: internal || null, valores,
+      columnasDisponibles: [...new Set(map.values())], muestraCampos: items.slice(0, 2).map(item => item.fields) };
+    return valores;
   }
 
   async load() {
@@ -252,7 +263,7 @@ class GraphDataProvider extends DataProvider {
     const catClientes = await this.catalog(siteId, byName, "clients", warnings);
     // El reporte mensual lo ve tambien el consultor, asi que la lista de
     // formatos se arma igual para los dos roles.
-    const formats = await this.columnValues(siteId, byName, "clients", APP.graph.formatColumn);
+    const formats = await this.columnValues(siteId, byName, "clients", APP.formatColumn, warnings);
     const catConsultores = await this.catalog(siteId, byName, "consultants", warnings);
 
     const timesheet = this.requireList(byName, APP.graph.lists.timesheet);
@@ -315,6 +326,7 @@ class GraphDataProvider extends DataProvider {
       columnas: Object.fromEntries(Object.keys(APP.columns).map(k => [APP.columns[k], interno(k)])),
       totalElementos: items.length,
       catalogos: { clientes: catClientes.porId.size, consultores: catConsultores.porId.size },
+      formatos: state.diagColumna || null,
       muestra: items.slice(0, 3).map(i => ({ id: i.id, createdBy: i.createdBy?.user, fields: i.fields })),
       convertidos: rows.slice(0, 3)
     };
@@ -485,7 +497,7 @@ function setGateChecking(activo) {
 
 // Version de los tres archivos. Se inyecta al publicar en el HTML, el CSS y
 // el JS a la vez; si no coinciden, la pagina lo dice en vez de fallar callada.
-const VERSION_TIMESHEET = "2026.09.27-2";
+const VERSION_TIMESHEET = "2026.09.28-1";
 
 function versionesPublicadas() {
   const html = document.querySelector('meta[name="timesheet-version"]')?.content || L("sin versión", "no version");
@@ -842,17 +854,13 @@ function hideClientDetail() {
 function horasDeDe(record) { return clean(record.original?._horasDe) || record.consultant; }
 function asignadoADe(record) { return clean(record.original?._asignadoA); }
 
-// Se arma con todos los registros visibles, no con los filtrados, para que la
-// lista no cambie de contenido cada vez que se mueve un filtro.
-function focusConsultantOptions() {
-  return unique(state.records.map(horasDeDe)).sort((a, b) => a.localeCompare(b, "es"));
-}
-
+// Sin consultor elegido suma a todos: los mosaicos siguen sirviendo como total
+// general de horas propias contra horas reportadas a nombre de otro.
 function focusTotals(rows, consultor) {
   const propias = [], ajenas = [];
   rows.forEach(record => {
     const horasDe = horasDeDe(record);
-    if (norm(horasDe) !== norm(consultor)) return;
+    if (consultor && norm(horasDe) !== norm(consultor)) return;
     const asignadoA = asignadoADe(record);
     // Sin "Asignado a", o con el mismo nombre, la hora se reporta a su nombre.
     if (!asignadoA || norm(asignadoA) === norm(horasDe)) propias.push(record);
@@ -861,40 +869,27 @@ function focusTotals(rows, consultor) {
   return { propias: sum(propias), ajenas: sum(ajenas), nPropias: propias.length, nAjenas: ajenas.length };
 }
 
-function renderConsultantFocus(rows) {
-  const selector = document.getElementById("consultantFocus");
+function renderConsultantFocus() {
   const mosaicos = document.getElementById("consultantFocusKpis");
-  const opciones = focusConsultantOptions();
-  if (!opciones.length) {
-    selector.innerHTML = `<option value="">${esc(L("Sin consultores", "No consultants"))}</option>`;
-    selector.disabled = true;
-    mosaicos.innerHTML = `<p class="empty-cell">${esc(L("No hay horas capturadas todavía.", "No hours logged yet."))}</p>`;
-    return;
-  }
-  selector.disabled = false;
-  if (!state.isAdmin) {
-    // El consultor no elige: sus registros son los unicos que le llegan, asi que
-    // la lista trae un solo nombre y el selector va oculto (data-solo-admin).
-    state.focusConsultant = opciones[0];
-  } else if (!opciones.includes(state.focusConsultant)) {
-    // El administrador arranca en su propio nombre cuando aparece en la lista;
-    // si no captura horas, cae en el primero por orden alfabetico.
-    state.focusConsultant = opciones.find(nombre => norm(nombre) === norm(state.me?.displayName)) || opciones[0];
-  }
-  selector.innerHTML = opciones.map(nombre => `<option value="${esc(nombre)}"${nombre === state.focusConsultant ? " selected" : ""}>${esc(nombre)}</option>`).join("");
-  selector.value = state.focusConsultant;
-  const t = focusTotals(rows, state.focusConsultant);
+  if (!mosaicos) return;
+  // Manda el filtro global "Consultor". Se recalcula ignorando ese filtro y se
+  // selecciona por "Horas de", no por el nombre reportado: filtrar por el nombre
+  // reportado borraria justo lo que estos mosaicos existen para mostrar, que son
+  // las horas que alguien trabajo y se reportan a nombre de otra persona.
+  const elegido = state.filters.consultant || "";
+  const t = focusTotals(applyFilters(state.records, { consultant: "" }), elegido);
   const registros = n => `${n} ${n === 1 ? L("registro", "record") : L("registros", "records")}`;
+  const alcance = elegido || L("todos los consultores", "all consultants");
   const kpis = [
-    [L("Total de horas trabajadas", "Total hours worked"), fmtHours(t.propias + t.ajenas), L(`${registros(t.nPropias + t.nAjenas)} · según los filtros`, `${registros(t.nPropias + t.nAjenas)} · per the filters`)],
-    [L("Horas trabajadas asignadas a mí", "Hours worked assigned to me"), fmtHours(t.propias), L(`${registros(t.nPropias)} a su propio nombre`, `${registros(t.nPropias)} under their own name`)],
+    [L("Total de horas trabajadas", "Total hours worked"), fmtHours(t.propias + t.ajenas), `${registros(t.nPropias + t.nAjenas)} · ${alcance}`],
+    [L("Horas trabajadas asignadas a mí", "Hours worked assigned to me"), fmtHours(t.propias), L(`${registros(t.nPropias)} a nombre propio`, `${registros(t.nPropias)} under their own name`)],
     [L("Horas trabajadas asignadas a otros", "Hours worked assigned to others"), fmtHours(t.ajenas), L(`${registros(t.nAjenas)} reportados a otro consultor`, `${registros(t.nAjenas)} reported under another consultant`)]
   ];
   mosaicos.innerHTML = kpis.map(([label, value, foot]) => `<div class="kpi"><span class="kpi__label">${esc(label)}</span><strong class="kpi__value">${esc(value)}</strong><span class="kpi__foot">${esc(foot)}</span></div>`).join("");
 }
 
 function renderConsultants(rows) {
-  renderConsultantFocus(rows);
+  renderConsultantFocus();
   const total = sum(rows);
   const items = [...groupBy(rows,r=>r.consultant || SIN_CONSULTOR())].map(([name,data])=>{
     const capacity = capacityFor(name, state.filters.period || monthKey(data[0]?.date));
@@ -1394,10 +1389,6 @@ function navigateToView(view) {
 
 function bindEvents() {
   document.querySelectorAll("[data-view]").forEach(el=>el.addEventListener("click",()=>navigateToView(el.dataset.view)));
-  document.getElementById("consultantFocus").addEventListener("change", event => {
-    state.focusConsultant = event.target.value;
-    renderConsultantFocus(applyFilters(state.records));
-  });
   document.getElementById("kpiGrid").addEventListener("click",e=>{const card=e.target.closest("[data-kpi-view]");if(card)navigateToView(card.dataset.kpiView);});
   document.getElementById("menuToggle").addEventListener("click",e=>{const open=document.getElementById("sidebar").classList.toggle("open");e.currentTarget.setAttribute("aria-expanded",String(open));});
   ["filterPeriod","filterFrom","filterTo","filterClient","filterConsultant","filterRequirement","filterActivity"].forEach(id=>document.getElementById(id).addEventListener("change",()=>{ajustarPeriodoYRango(id);updateAll();}));
