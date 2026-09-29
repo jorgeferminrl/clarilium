@@ -24,6 +24,7 @@ const { analizarXml, analizarPdf, cruzar, ErrorFactura } = require('../../lib/cf
  *   FACTURACION_LISTA (opcional)          Nombre de la lista; por omision
  *                                         DestinatariosFacturacionColaboradores
  *   PORTAL_CLIENT_ID (opcional)           Id. de "CLARILIUM Reportes"
+ *   PORTAL_TENANT_ID (opcional)           GUID del tenant (por omision el de CLARILIUM)
  *
  * Permisos que necesita el registro de CLIENT_ID en Entra ID:
  *   Mail.Send (ya lo tiene, limitado a contacto@) y Sites.Selected con permiso
@@ -32,6 +33,9 @@ const { analizarXml, analizarPdf, cruzar, ErrorFactura } = require('../../lib/cf
 
 const CONFIG = {
   tenant: () => process.env.TENANT_ID,
+  // Id. (GUID) del tenant, el que viene en el token. TENANT_ID puede estar
+  // escrito como dominio (clarilium.onmicrosoft.com) y no serviria para comparar.
+  tenantId: () => process.env.PORTAL_TENANT_ID || '4ded6d76-6c1b-43eb-813b-423ecf957f15',
   portalClientId: () => process.env.PORTAL_CLIENT_ID || 'e122c4bd-0f08-48c1-a274-f55925229261',
   lista: () => process.env.FACTURACION_LISTA || 'DestinatariosFacturacionColaboradores',
   sharepointHost: 'clarilium.sharepoint.com',
@@ -75,7 +79,7 @@ let llaves = { porKid: new Map(), leidas: 0 };
 async function llavePublica(kid) {
   const vieja = Date.now() - llaves.leidas;
   if (!llaves.porKid.has(kid) && vieja > 5 * 60 * 1000 || vieja > 12 * 3600 * 1000) {
-    const r = await fetch(`https://login.microsoftonline.com/${CONFIG.tenant()}/discovery/v2.0/keys`);
+    const r = await fetch(`https://login.microsoftonline.com/${CONFIG.tenantId()}/discovery/v2.0/keys`);
     if (!r.ok) throw new Error(`JWKS: HTTP ${r.status}`);
     const { keys } = await r.json();
     const porKid = new Map();
@@ -89,8 +93,9 @@ const deBase64Url = (s) => Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 
 
 /** Devuelve { correo, nombre, oid } si el token es valido; si no, null. */
 async function verificarToken(request) {
-  const cabecera = request.headers.get('authorization') || '';
-  const token = cabecera.startsWith('Bearer ') ? cabecera.slice(7).trim() : '';
+  // Va en una cabecera propia: Azure Static Web Apps reserva "Authorization"
+  // para su inicio de sesion integrado y no siempre la entrega a la funcion.
+  const token = (request.headers.get('x-clarilium-token') || '').trim();
   const partes = token.split('.');
   if (partes.length !== 3 || token.length > 8000) return null;
   let enc, datos;
@@ -106,7 +111,7 @@ async function verificarToken(request) {
   if (!firmaValida) return null;
 
   const ahora = Math.floor(Date.now() / 1000);
-  const tenant = CONFIG.tenant();
+  const tenant = CONFIG.tenantId();
   const correo = norm(datos.preferred_username || '');
   if (datos.aud !== CONFIG.portalClientId()) return null;
   if (datos.tid !== tenant || datos.iss !== `https://login.microsoftonline.com/${tenant}/v2.0`) return null;

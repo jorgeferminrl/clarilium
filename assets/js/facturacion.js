@@ -453,7 +453,7 @@ async function enviar(e) {
     try {
       r = await fetch(FAC.api, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", "X-Clarilium-Token": token },
         body: JSON.stringify(cuerpo)
       });
     } catch { throw { titulo: m("No se pudo contactar al servidor. Revisa tu conexión e inténtalo de nuevo.", "The server could not be reached. Check your connection and try again.") }; }
