@@ -1,4 +1,4 @@
-:root{--timesheet-version:"2026.09.27-1";}
+:root{--timesheet-version:"2026.09.27-2";}
 :root {
   --clarilium-night: #040814;
   --clarilium-navy: #0D1728;
@@ -139,6 +139,17 @@ tbody tr.clickable:hover { background: rgba(148,64,255,.08); cursor: pointer; }
 .progress-line { min-width: 140px; display: flex; align-items: center; gap: 8px; }
 .progress-line span { width: 76px; height: 8px; border-radius: 99px; background: var(--border); overflow: hidden; }
 .progress-line i { display: block; height: 100%; background: var(--clarilium-purple); border-radius: inherit; }
+/* Paleta del formato del reporte mensual. El atributo lo pone el JS al elegir
+   en el desplegable "Formato"; el PDF usa la misma paleta desde timesheet.js. */
+body { --fmt-barra: #040814; --fmt-acento: #9440FF; --fmt-banda: #F3EAFF; --fmt-banda-texto: #0D1728; --fmt-tabla: #0D1728; }
+body[data-formato="dxgrow"] { --fmt-barra: #2B2E31; --fmt-acento: #B7C40B; --fmt-banda: #7F7D7C; --fmt-banda-texto: #FFFFFF; --fmt-tabla: #2B2E31; }
+
+.formato-picker { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--muted); font-size: .8rem; font-weight: 750; white-space: nowrap; }
+.formato-picker select { width: auto; min-width: 156px; min-height: 40px; }
+
+/* Cabecera que solo existe en el papel: replica la del PDF. */
+.print-header { display: none; }
+
 .approval-report { display: grid; gap: 22px; }
 .approval-detail-panel { overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: 0 8px 26px rgba(13,23,40,.05); }
 .approval-detail-scroll { border-radius: 7px; }
@@ -255,7 +266,7 @@ body.dark .alert--warning { color: #ffd77b; background: #3b2a05; border-color: #
 @media print {
   @page { margin: 12mm; size: landscape; }
   body { background: #fff; }
-  .topbar, .sidebar, .filter-panel, .section-heading, .toast, .view:not(#view-approval) { display: none !important; }
+  .topbar, .sidebar, .filter-panel, .section-heading, .toast, .demo-banner, .skip-link, .view:not(#view-approval) { display: none !important; }
   .app-shell { display: block; }
   .main { max-width: none; padding: 0; }
   #view-approval { display: block !important; }
@@ -268,6 +279,17 @@ body.dark .alert--warning { color: #ffd77b; background: #3b2a05; border-color: #
   .approval-detail-table thead { display: table-header-group; }
   .approval-client-total-row { break-inside: avoid; }
   .approval-total-summary { break-inside: avoid; }
+
+  /* Sin esto el navegador imprime los fondos en blanco y la cabecera oscura y
+     las bandas de total desaparecen. */
+  body, .print-header, thead, .approval-total-summary { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-header { display: flex; align-items: center; gap: 8mm; margin: 0 0 8mm; padding: 5mm 8mm; background: var(--fmt-barra); border-top: 2mm solid var(--fmt-acento); color: #fff; break-inside: avoid; }
+  .print-header__logo { height: 11mm; width: auto; }
+  body[data-formato="dxgrow"] .print-header__logo { height: 15mm; }
+  .print-header__title { font-size: 15pt; font-weight: 700; letter-spacing: -.01em; }
+  thead { background: var(--fmt-tabla); color: #fff; }
+  .approval-total-summary { background: var(--fmt-banda); border-left-color: var(--fmt-acento); color: var(--fmt-banda-texto); }
+  .approval-overall-total { border-color: var(--fmt-acento); }
 }
 
 /* ---- Capa de sesion y estado de origen (agregado al migrar a SharePoint) ---- */

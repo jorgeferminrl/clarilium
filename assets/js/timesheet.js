@@ -44,6 +44,9 @@ const APP = {
     asignadoA: "Asignado a"
   },
   // Posibles nombres de la columna de nombre en cada catalogo, en orden de preferencia.
+  // Columna de la lista Clientes que alimenta el desplegable "Formato" del
+  // reporte mensual. Es la del cliente de primer nivel, no la del subcliente.
+  formatColumn: "Cliente",
   catalogColumns: {
     clients: ["Subcliente", "Cliente", "Nombre del cliente", "Title"],
     consultants: ["Consultor", "Nombre y Apellido", "Nombre", "Title"]
@@ -88,7 +91,7 @@ const saved = readStorage();
 const state = {
   records: [], invalidRows: [], rawRows: [], catalogs: { clients: [], developers: [] }, warnings: [],
   sourceName: "SharePoint", isAdmin: false, me: null, loadedAt: null, syncStatus: "loading", syncError: "", refreshPromise: null, dataSignature: "", filters: {}, charts: {},
-  selectedClient: "", selectedConsultant: "", selectedConsultantClient: "", focusConsultant: "",
+  selectedClient: "", selectedConsultant: "", selectedConsultantClient: "", focusConsultant: "", approvalFormat: "CLARILIUM",
   clientRates: Array.isArray(saved.clientRates) ? saved.clientRates : [],
   collabRates: Array.isArray(saved.collabRates) ? saved.collabRates : [],
   manualAssignments: saved.manualAssignments || {},
@@ -218,6 +221,20 @@ class GraphDataProvider extends DataProvider {
     return vacio;
   }
 
+  // Valores unicos de una columna suelta de un catalogo. Se usa para el
+  // desplegable "Formato": ahi no van los subclientes, va el cliente de primer
+  // nivel, que es quien tiene identidad grafica propia.
+  async columnValues(siteId, byName, listKey, columnName) {
+    const list = byName.get(norm(APP.graph.lists[listKey]));
+    if (!list) return [];
+    const map = await this.columnMap(siteId, list.id);
+    const internal = map.get(norm(columnName));
+    if (!internal) return [];
+    const items = await this.itemFields(siteId, list.id);
+    return unique(items.map(item => lookupText(item.fields?.[internal])))
+      .sort((a, b) => a.localeCompare(b, "es"));
+  }
+
   async load() {
     const warnings = [];
     state.me = await this.me();
@@ -233,6 +250,9 @@ class GraphDataProvider extends DataProvider {
     // Los catalogos van primero: sus mapas id -> texto son los que resuelven
     // las columnas de busqueda de la lista Timesheet.
     const catClientes = await this.catalog(siteId, byName, "clients", warnings);
+    // El reporte mensual lo ve tambien el consultor, asi que la lista de
+    // formatos se arma igual para los dos roles.
+    const formats = await this.columnValues(siteId, byName, "clients", APP.graph.formatColumn);
     const catConsultores = await this.catalog(siteId, byName, "consultants", warnings);
 
     const timesheet = this.requireList(byName, APP.graph.lists.timesheet);
@@ -324,7 +344,7 @@ class GraphDataProvider extends DataProvider {
     }
 
     return {
-      rows: visibles, clients, developers: consultants, warnings,
+      rows: visibles, clients, developers: consultants, warnings, formats,
       sourceName: `SharePoint · ${APP.graph.lists.timesheet}`
     };
   }
@@ -372,7 +392,7 @@ class DemoDataProvider extends DataProvider {
       }
     }
     return {
-      rows, clients, developers: consultants,
+      rows, clients, developers: consultants, formats: ["Dxgrow"],
       warnings: [L("Modo demo: la información es inventada y no proviene de SharePoint.", "Demo mode: the information is made up and does not come from SharePoint.")],
       sourceName: L("Datos de ejemplo (modo demo)", "Sample data (demo mode)")
     };
@@ -465,7 +485,7 @@ function setGateChecking(activo) {
 
 // Version de los tres archivos. Se inyecta al publicar en el HTML, el CSS y
 // el JS a la vez; si no coinciden, la pagina lo dice en vez de fallar callada.
-const VERSION_TIMESHEET = "2026.09.27-1";
+const VERSION_TIMESHEET = "2026.09.27-2";
 
 function versionesPublicadas() {
   const html = document.querySelector('meta[name="timesheet-version"]')?.content || L("sin versión", "no version");
@@ -582,14 +602,15 @@ function dataSignature(records,catalogs) {
   return JSON.stringify({
     records:records.map(r=>[r.id,r.timestamp,r.client,toISO(r.date),r.hours,r.requirement,r.activity,r.consultant,r.note,r.internal]),
     clients:catalogs.clients,
-    developers:catalogs.developers
+    developers:catalogs.developers,
+    formats:catalogs.formats
   });
 }
 
 function loadPayload(payload, { preserveUi=false }={}) {
   const uiState = preserveUi ? captureUiState() : null;
   const normalized = normalizePayload(payload);
-  const catalogs={clients:payload.clients||[],developers:payload.developers||[]};
+  const catalogs={clients:payload.clients||[],developers:payload.developers||[],formats:payload.formats||[]};
   const signature=dataSignature(normalized.records,catalogs);
   const unchanged=preserveUi&&signature===state.dataSignature;
   state.rawRows = payload.rows;
@@ -646,6 +667,7 @@ function populateControls() {
   document.getElementById("filterConsultant").innerHTML = optionList(consultants);
   document.getElementById("filterRequirement").innerHTML = optionList(requirements);
   document.getElementById("filterActivity").innerHTML = optionList(activities);
+  populateApprovalFormats();
   renderRateEditors();
   renderManualAssignments();
 }
@@ -987,6 +1009,51 @@ function exportRowsPdf(rows,title,filename) {
   doc.save(`${filename}.pdf`);
 }
 
+/* ------------------------------------------------------------------ *
+ * Formatos del reporte mensual.
+ *
+ * Cada cliente con identidad grafica propia entra aqui con su paleta y su
+ * logotipo. El logotipo sale de estimacion-logos.js, que ya los trae
+ * incrustados en base64: asi el PDF y la impresion funcionan igual publicados
+ * que abiertos desde el disco. Un cliente que no este en esta tabla cae en el
+ * formato de CLARILIUM, que es el emisor del reporte.
+ * ------------------------------------------------------------------ */
+const FORMATOS = {
+  CLARILIUM: { logo: "clarilium", logoAlto: 10, barra: [4, 8, 20],    acento: [148, 64, 255], banda: [243, 234, 255], bandaTexto: [13, 23, 40],    tabla: [13, 23, 40] },
+  Dxgrow:    { logo: "dxgrow",    logoAlto: 16, barra: [43, 46, 49],  acento: [183, 196, 11], banda: [127, 125, 124], bandaTexto: [255, 255, 255], tabla: [43, 46, 49] }
+};
+
+function formatoActual() {
+  const clave = Object.keys(FORMATOS).find(nombre => norm(nombre) === norm(state.approvalFormat));
+  return FORMATOS[clave] || FORMATOS.CLARILIUM;
+}
+
+function logoDeFormato(formato) { return window.ESTIMACION_LOGOS?.[formato.logo] || null; }
+
+// El desplegable arranca en CLARILIUM y sigue con los clientes de la columna
+// "Cliente" del catalogo. Hoy eso da CLARILIUM y Dxgrow; cuando se agregue un
+// cliente nuevo aparece solo, sin tocar codigo.
+function populateApprovalFormats() {
+  const control = document.getElementById("approvalFormat");
+  if (!control) return;
+  const opciones = unique(["CLARILIUM", ...(state.catalogs.formats || [])]);
+  if (!opciones.some(nombre => norm(nombre) === norm(state.approvalFormat))) state.approvalFormat = opciones[0];
+  control.innerHTML = opciones.map(nombre => `<option value="${esc(nombre)}">${esc(nombre)}</option>`).join("");
+  control.value = state.approvalFormat;
+  aplicarFormatoImpresion();
+}
+
+// La impresion del navegador se pinta con la hoja de estilos, no con jsPDF, asi
+// que el formato viaja como atributo en <body> y el logotipo se coloca en la
+// cabecera que solo existe al imprimir.
+function aplicarFormatoImpresion() {
+  const formato = formatoActual();
+  document.body.dataset.formato = formato.logo;
+  const imagen = document.getElementById("printHeaderLogo");
+  const logo = logoDeFormato(formato);
+  if (imagen && logo) { imagen.src = logo.src; imagen.alt = state.approvalFormat; }
+}
+
 function approvalRows() {
   return applyFilters(state.records);
 }
@@ -1028,26 +1095,38 @@ function exportApprovalPdf() {
   if (!window.confirm(L(`Se exportará un reporte con ${fmtHours(total)} horas. ¿Continuar?`, `A report with ${fmtHours(total)} hours will be exported. Continue?`))) return;
   if (!window.jspdf?.jsPDF) return toast(L("La biblioteca PDF no está disponible.", "The PDF library is not available."));
   const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:"mm",format:"letter",orientation:"landscape"});
+  const formato=formatoActual(); const logo=logoDeFormato(formato);
   if (typeof doc.autoTable !== "function") return toast(L("La extensión de tablas PDF no está disponible.", "The PDF table extension is not available."));
   const width=doc.internal.pageSize.getWidth(); const height=doc.internal.pageSize.getHeight();
   const headerPages=new Set();
-  const drawHeader=()=>{const page=doc.internal.getCurrentPageInfo().pageNumber;if(headerPages.has(page))return;headerPages.add(page);doc.setFillColor(4,8,20);doc.rect(0,0,width,24,"F");doc.setFillColor(148,64,255);doc.rect(0,0,width,3,"F");doc.setTextColor(255,255,255);doc.setFontSize(15);doc.text(L("CLARILIUM — Reporte mensual de horas", "CLARILIUM — Monthly hours report"),14,15);};
+  const drawHeader=()=>{
+    const page=doc.internal.getCurrentPageInfo().pageNumber;
+    if(headerPages.has(page))return;
+    headerPages.add(page);
+    doc.setFillColor(...formato.barra);doc.rect(0,0,width,24,"F");
+    doc.setFillColor(...formato.acento);doc.rect(0,0,width,3,"F");
+    // El logotipo sustituye al nombre escrito: es la cabecera de quien recibe.
+    let x=14;
+    if(logo){const alto=formato.logoAlto;const ancho=alto*logo.ancho/logo.alto;doc.addImage(logo.src,"PNG",x,3+(21-alto)/2,ancho,alto);x+=ancho+6;}
+    doc.setTextColor(255,255,255);doc.setFontSize(15);
+    doc.text(L("Reporte mensual","Monthly report"),x,16);
+  };
   const drawFooter=()=>{doc.setTextColor(102,112,133);doc.setFontSize(7);doc.text(`${L("Página", "Page")} ${doc.internal.getCurrentPageInfo().pageNumber}`,width-10,height-7,{align:"right"});};
-  const drawTotal=(label,hours,y)=>{doc.setFillColor(243,234,255);doc.rect(10,y,width-20,12,"F");doc.setFillColor(148,64,255);doc.rect(10,y,2,12,"F");doc.setTextColor(13,23,40);doc.setFontSize(10);doc.setFont("helvetica","bold");doc.text(label,16,y+8);doc.text(`${fmtHours(hours)} ${L("horas", "hours")}`,width-16,y+8,{align:"right"});doc.setFont("helvetica","normal");return y+18;};
+  const drawTotal=(label,hours,y)=>{doc.setFillColor(...formato.banda);doc.rect(10,y,width-20,12,"F");doc.setFillColor(...formato.acento);doc.rect(10,y,2,12,"F");doc.setTextColor(...formato.bandaTexto);doc.setFontSize(10);doc.setFont("helvetica","bold");doc.text(label,16,y+8);doc.text(`${fmtHours(hours)} ${L("horas", "hours")}`,width-16,y+8,{align:"right"});doc.setFont("helvetica","normal");return y+18;};
   drawHeader();
   let y=drawTotal(L("Total de horas", "Total hours"),total,30);
   const pdfBody=groups.flatMap(group=>[
     ...group.rows,
-    [{content:`${L("Total de horas", "Total hours")} ${group.client}`,colSpan:6,styles:{fillColor:[243,234,255],fontStyle:"bold",lineColor:[148,64,255],lineWidth:{top:.2,bottom:.2,left:1.2}}},{content:`${fmtHours(group.hours)} ${L("horas", "hours")}`,styles:{fillColor:[243,234,255],fontStyle:"bold",halign:"right",lineColor:[148,64,255],lineWidth:{top:.2,right:.2,bottom:.2}}}]
+    [{content:`${L("Total de horas", "Total hours")} ${group.client}`,colSpan:6,styles:{fillColor:formato.banda,textColor:formato.bandaTexto,fontStyle:"bold",lineColor:formato.acento,lineWidth:{top:.2,bottom:.2,left:1.2}}},{content:`${fmtHours(group.hours)} ${L("horas", "hours")}`,styles:{fillColor:formato.banda,textColor:formato.bandaTexto,fontStyle:"bold",halign:"right",lineColor:formato.acento,lineWidth:{top:.2,right:.2,bottom:.2}}}]
   ]);
-  doc.autoTable({head:[data.headers],body:pdfBody,startY:y,margin:{top:30,left:10,right:10,bottom:16},theme:"striped",headStyles:{fillColor:[13,23,40],textColor:255},alternateRowStyles:{fillColor:[247,247,248]},styles:{fontSize:7,cellPadding:2,overflow:"linebreak"},columnStyles:{0:{cellWidth:25},1:{cellWidth:22},2:{cellWidth:29},3:{cellWidth:31},4:{cellWidth:32},5:{cellWidth:"auto"},6:{cellWidth:16,halign:"right"}},rowPageBreak:"avoid",showHead:"everyPage",willDrawPage:drawHeader,didDrawPage:drawFooter});
+  doc.autoTable({head:[data.headers],body:pdfBody,startY:y,margin:{top:30,left:10,right:10,bottom:16},theme:"striped",headStyles:{fillColor:formato.tabla,textColor:255},alternateRowStyles:{fillColor:[247,247,248]},styles:{fontSize:7,cellPadding:2,overflow:"linebreak"},columnStyles:{0:{cellWidth:25},1:{cellWidth:22},2:{cellWidth:29},3:{cellWidth:31},4:{cellWidth:32},5:{cellWidth:"auto"},6:{cellWidth:16,halign:"right"}},rowPageBreak:"avoid",showHead:"everyPage",willDrawPage:drawHeader,didDrawPage:drawFooter});
   y=doc.lastAutoTable.finalY+8;
   let footerNeedsPageNumber=false;
   if(y>height-30){doc.addPage();drawHeader();y=30;footerNeedsPageNumber=true;}
   drawTotal(L("Total de horas", "Total hours"),total,y);
   if(footerNeedsPageNumber)drawFooter();
   const period=state.filters.period||L("todos-los-periodos", "all-periods");
-  doc.save(`${L("reporte-aprobacion", "approval-report")}-${period}.pdf`);
+  doc.save(`${L("reporte-mensual", "monthly-report")}-${norm(state.approvalFormat).replace(/[^a-z0-9]+/g,"-")}-${period}.pdf`);
 }
 
 function rateFor(name,date,rates,nameField="name") {
@@ -1338,8 +1417,12 @@ function bindEvents() {
   consultantMixChart.addEventListener("mousemove",e=>{const chart=state.charts.consultantMixChart;if(chart)chart.canvas.style.cursor=consultantElementFromPointer(e,chart,"xy")?"pointer":"default";});
   consultantMixChart.addEventListener("mouseleave",()=>{consultantMixChart.style.cursor="default";});
   consultantMixChart.addEventListener("click",e=>{const chart=state.charts.consultantMixChart;if(!chart)return;const element=consultantElementFromPointer(e,chart,"xy");if(!element)return;const consultant=chart.data.labels[element.index];const client=chart.data.datasets[element.datasetIndex]?.label;if(consultant&&client)showConsultantDetail(consultant,client);});
+  document.getElementById("approvalFormat").addEventListener("change",event=>{
+    state.approvalFormat=event.target.value;
+    aplicarFormatoImpresion();
+  });
   document.getElementById("pdfApproval").addEventListener("click",exportApprovalPdf);
-  document.getElementById("printApproval").addEventListener("click",()=>{const rows=approvalRows();if(!rows.length)return toast(L("No hay datos para imprimir.", "There is no data to print."));if(window.confirm(L(`Se imprimirá un reporte con ${fmtHours(sum(rows))} horas. ¿Continuar?`, `A report with ${fmtHours(sum(rows))} hours will be printed. Continue?`)))window.print();});
+  document.getElementById("printApproval").addEventListener("click",()=>{const rows=approvalRows();if(!rows.length)return toast(L("No hay datos para imprimir.", "There is no data to print."));if(!window.confirm(L(`Se imprimirá un reporte con ${fmtHours(sum(rows))} horas. ¿Continuar?`, `A report with ${fmtHours(sum(rows))} hours will be printed. Continue?`)))return;aplicarFormatoImpresion();window.print();});
   document.getElementById("addClientRate").addEventListener("click",()=>addRate("client"));
   document.getElementById("addCollabRate").addEventListener("click",()=>addRate("collab"));
   ["clientRatesBody","collabRatesBody"].forEach(id=>{const body=document.getElementById(id);body.addEventListener("change",rateEditorChange);body.addEventListener("click",rateEditorRemove);});
