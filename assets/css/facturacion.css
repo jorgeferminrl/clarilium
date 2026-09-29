@@ -1,0 +1,105 @@
+/* Portal de facturacion · www.clarilium.com/portal/facturacion
+   La barra superior, el porton de acceso y los colores base vienen de
+   portal-inicio.css (los mismos del portal y del TimeSheet). Aqui solo va el
+   formulario del artboard "Facturacion". Sin estilos en linea: la politica de
+   contenido del sitio no los admite. */
+
+body.facturacion { min-height: 100vh; display: flex; flex-direction: column; }
+.fac { flex: 1 0 auto; display: flex; flex-direction: column; min-height: calc(100vh - var(--header-height)); }
+.fac[hidden] { display: none !important; }
+.fac__main { flex: 1 0 auto; width: 100%; max-width: 948px; margin: 0 auto; padding: 64px 24px 72px; display: flex; flex-direction: column; gap: 28px; }
+.fac__main:focus { outline: none; }
+
+.fac__encabezado h1 { margin: 0; font-size: 36px; font-weight: 800; letter-spacing: -.01em; line-height: 1.15; color: var(--clarilium-night); }
+.fac__encabezado p { margin: 8px 0 0; font-size: 16px; color: var(--muted); }
+body.dark .fac__encabezado h1 { color: var(--clarilium-white); }
+
+.fac__forma { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 6px 18px rgba(4,8,20,.06); padding: 36px 40px; display: flex; flex-direction: column; gap: 24px; }
+body.dark .fac__forma { box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+
+.fac__rejilla { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 24px; }
+.fac__rejilla--archivos { gap: 24px; }
+.fac__campo { display: flex; flex-direction: column; gap: 8px; min-width: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+.req { color: var(--danger); }
+body.dark .req { color: #f97066; }
+
+.fac__campo input[type="text"] { height: 46px; width: 100%; box-sizing: border-box; padding: 0 14px; border: 1px solid var(--clarilium-gray); border-radius: 8px; font: inherit; font-size: 15px; font-weight: 400; background: var(--surface); color: var(--text); }
+.fac__campo input[type="text"]::placeholder { color: var(--clarilium-muted); }
+body.dark .fac__campo input[type="text"] { border-color: #344057; background: var(--clarilium-night); }
+body.dark .fac__campo input[type="text"]::placeholder { color: #8b95a7; }
+.fac__campo input[type="text"]:focus { outline: none; border-color: var(--clarilium-purple); box-shadow: 0 0 0 3px rgba(148,64,255,.22); }
+.fac__campo input[aria-invalid="true"] { border-color: var(--danger); }
+body.dark .fac__campo input[aria-invalid="true"] { border-color: #f97066; }
+
+/* ---- Zonas de carga ---- */
+.zona { position: relative; height: 150px; box-sizing: border-box; padding: 12px 16px; border: 2px dashed var(--clarilium-purple-soft); border-radius: 10px; background: #F7F2FF; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; cursor: pointer; font-weight: 400; transition: border-color .15s ease, background-color .15s ease; }
+body.dark .zona { background: rgba(148,64,255,.08); }
+.zona:hover, .zona--encima { border-color: var(--clarilium-purple-dark); background: #EFE4FF; }
+body.dark .zona:hover, body.dark .zona--encima { background: rgba(148,64,255,.16); }
+.zona:focus-within { outline: 3px solid rgba(148,64,255,.34); outline-offset: 2px; }
+.zona__input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.zona__icono { width: 34px; height: 34px; fill: none; stroke: var(--clarilium-purple-dark); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+body.dark .zona__icono { stroke: var(--clarilium-purple-soft); }
+.zona__texto { font-size: 14px; color: var(--text); }
+.zona__enlace { color: var(--clarilium-purple-dark); font-weight: 600; text-decoration: underline; }
+body.dark .zona__enlace { color: var(--clarilium-purple-soft); }
+.zona__ayuda { font-size: 12px; color: var(--muted); }
+.zona__archivo { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 100%; }
+.zona__nombre { max-width: 100%; font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zona__estado { font-size: 12px; color: var(--muted); }
+
+.zona--ok { border-style: solid; border-color: var(--success, #15803D); background: #F0FAF3; }
+body.dark .zona--ok { background: rgba(21,128,61,.12); }
+.zona--ok .zona__icono, body.dark .zona--ok .zona__icono { stroke: #15803D; }
+body.dark .zona--ok .zona__icono { stroke: #4ade80; }
+.zona--ok .zona__estado { color: #15803D; font-weight: 600; }
+body.dark .zona--ok .zona__estado { color: #4ade80; }
+.zona--error { border-style: solid; border-color: var(--danger); background: #FEF3F2; }
+body.dark .zona--error { background: rgba(180,35,24,.14); }
+.zona--error .zona__icono { stroke: var(--danger); }
+body.dark .zona--error .zona__icono { stroke: #f97066; }
+.zona--error .zona__estado { color: var(--danger); font-weight: 600; }
+body.dark .zona--error .zona__estado { color: #f97066; }
+.zona--revisando .zona__estado::before { content: ""; display: inline-block; width: 11px; height: 11px; margin-right: 6px; vertical-align: -1px; border-radius: 50%; border: 2px solid rgba(154,54,255,.25); border-top-color: #9a36ff; animation: giro .9s linear infinite; }
+
+.zona__quitar { align-self: flex-start; border: 0; background: transparent; padding: 0; color: var(--muted); font-size: 12px; font-weight: 600; text-decoration: underline; }
+.zona__quitar:hover { color: var(--clarilium-purple); }
+
+/* ---- Mensajes ---- */
+.fac__mensajes { border-radius: 8px; padding: 14px 16px; font-size: 14px; line-height: 1.5; }
+.fac__mensajes p { margin: 0 0 6px; font-weight: 700; }
+.fac__mensajes ul { margin: 0; padding-left: 20px; }
+.fac__mensajes li + li { margin-top: 4px; }
+.fac__mensajes--error { background: #FEF3F2; border: 1px solid #FECDCA; color: #912018; }
+body.dark .fac__mensajes--error { background: rgba(180,35,24,.16); border-color: rgba(249,112,102,.45); color: #fecdca; }
+.fac__mensajes--ok { background: #ECFDF3; border: 1px solid #ABEFC6; color: #085D3A; }
+body.dark .fac__mensajes--ok { background: rgba(21,128,61,.16); border-color: rgba(74,222,128,.4); color: #bbf7d0; }
+.fac__mensajes--info { background: #F4EBFF; border: 1px solid #D6BBFB; color: #53389E; }
+body.dark .fac__mensajes--info { background: rgba(148,64,255,.14); border-color: rgba(181,100,255,.45); color: #e9d7fe; }
+
+/* ---- Pie del formulario ---- */
+.fac__pie { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.fac__nota { font-size: 13px; color: var(--muted); }
+.fac__boton { height: 48px; padding: 0 32px; border: 0; border-radius: 8px; background: var(--clarilium-purple-dark); color: #fff; font-size: 15px; font-weight: 700; display: inline-flex; align-items: center; gap: 10px; }
+.fac__boton:hover { background: var(--clarilium-purple); }
+.fac__boton:disabled { opacity: .6; cursor: progress; }
+.fac__boton--enviando::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; animation: giro .9s linear infinite; }
+
+/* ---- Pie de pagina ---- */
+.fac__footer { background: var(--clarilium-navy); color: var(--clarilium-gray); font-size: 13px; padding: 22px 64px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.fac__footer a { color: var(--clarilium-gray); text-decoration: none; }
+.fac__footer a:hover { color: var(--clarilium-purple-soft); }
+
+/* ---- Responsivo ---- */
+@media (max-width: 760px) {
+  .fac__main { padding: 32px 16px 48px; gap: 22px; }
+  .fac__encabezado h1 { font-size: 30px; }
+  .fac__forma { padding: 24px 18px; }
+  .fac__rejilla { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .fac__footer { padding: 18px 16px; flex-direction: column; align-items: flex-start; gap: 6px; }
+}
+@media (max-width: 480px) {
+  .fac__pie { flex-direction: column-reverse; align-items: stretch; }
+  .fac__boton { justify-content: center; }
+  .fac__nota { text-align: center; }
+}
