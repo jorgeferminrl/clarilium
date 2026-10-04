@@ -77,7 +77,7 @@ const SIN_CONSULTOR = () => L(SIN_CONSULTOR(), "No consultant");
 
 // Secciones que solo puede ver un administrador. Las tarifas viven dentro de
 // estas dos vistas, asi que ocultarlas tambien oculta las tarifas.
-const SECCIONES_ADMIN = ["clientBilling", "collabBilling"];
+const SECCIONES_ADMIN = ["collabBilling"];
 
 const DEFAULT_CONFIG = {
   theme: "light",
@@ -91,7 +91,9 @@ const saved = readStorage();
 const state = {
   records: [], invalidRows: [], rawRows: [], catalogs: { clients: [], developers: [] }, warnings: [],
   sourceName: "SharePoint", isAdmin: false, me: null, loadedAt: null, syncStatus: "loading", syncError: "", refreshPromise: null, dataSignature: "", filters: {}, charts: {},
-  selectedClient: "", selectedConsultant: "", selectedConsultantClient: "", approvalFormat: "CLARILIUM",
+  selectedClient: "", selectedConsultant: "", selectedConsultantClient: "",
+  // Orden y filtros del reporte. Vacios = documento completo en su orden natural.
+  reportSort: { key: "", dir: "asc" }, reportFilters: {}, approvalFormat: "CLARILIUM",
   clientRates: Array.isArray(saved.clientRates) ? saved.clientRates : [],
   collabRates: Array.isArray(saved.collabRates) ? saved.collabRates : [],
   manualAssignments: saved.manualAssignments || {},
@@ -403,6 +405,25 @@ class DemoDataProvider extends DataProvider {
         });
       }
     }
+    // Ensayo de roles. Con ?rol=consultor la pagina se comporta como con la
+    // cuenta de un consultor: se recorta la informacion igual que lo hace
+    // SharePoint del lado del servidor y se apaga el rol de administrador. Solo
+    // corre en modo demo, es decir con el archivo abierto desde el disco, asi
+    // que no hay manera de activarlo en el sitio publicado.
+    if (/^(consultor|consultant)$/i.test(new URLSearchParams(location.search).get("rol") || "")) {
+      const yo = consultants[0];
+      state.isAdmin = false;
+      state.me = { displayName: yo, mail: "consultor.demo@clarilium.com", userPrincipalName: "consultor.demo@clarilium.com" };
+      applyRoleVisibility();
+      const mios = rows.filter(row => row._horasDe === yo);
+      return {
+        rows: mios, clients: unique(mios.map(row => row["Cliente"])).sort((a, b) => a.localeCompare(b, "es")),
+        developers: [yo], formats: ["Dxgrow"],
+        warnings: [L(`Modo demo · ensayo de rol: la página se ve como la vería ${yo}.`, `Demo mode · role rehearsal: the page looks as ${yo} would see it.`)],
+        sourceName: L("Datos de ejemplo (modo demo)", "Sample data (demo mode)")
+      };
+    }
+
     return {
       rows, clients, developers: consultants, formats: ["Dxgrow"],
       warnings: [L("Modo demo: la información es inventada y no proviene de SharePoint.", "Demo mode: the information is made up and does not come from SharePoint.")],
@@ -497,7 +518,7 @@ function setGateChecking(activo) {
 
 // Version de los tres archivos. Se inyecta al publicar en el HTML, el CSS y
 // el JS a la vez; si no coinciden, la pagina lo dice en vez de fallar callada.
-const VERSION_TIMESHEET = "2026.09.28-1";
+const VERSION_TIMESHEET = "2026.09.30-9";
 
 function versionesPublicadas() {
   const html = document.querySelector('meta[name="timesheet-version"]')?.content || L("sin versión", "no version");
@@ -539,8 +560,9 @@ function applyRoleVisibility() {
   });
   // Accesos a catalogos: solo el administrador los ve.
   document.querySelectorAll("[data-solo-admin]").forEach(el => { el.hidden = !admin; });
+  fijarConsultorDelUsuario();
   const actual = document.querySelector(".view.active")?.dataset.section;
-  if (!admin && (!actual || SECCIONES_ADMIN.includes(actual))) setView("summary");
+  if (!admin && (!actual || SECCIONES_ADMIN.includes(actual))) setView("consultants");
   renderAccountChip();
 }
 
@@ -679,9 +701,23 @@ function populateControls() {
   document.getElementById("filterConsultant").innerHTML = optionList(consultants);
   document.getElementById("filterRequirement").innerHTML = optionList(requirements);
   document.getElementById("filterActivity").innerHTML = optionList(activities);
+  fijarConsultorDelUsuario();
   populateApprovalFormats();
   renderRateEditors();
   renderManualAssignments();
+}
+
+// El filtro de consultor es del administrador. Al consultor se le deja fijado en
+// su nombre y, sobre todo, collectFilters lo ignora: sus registros ya vienen
+// recortados a lo suyo, y aplicarlo por el nombre reportado le esconderia las
+// horas que trabajo y quedaron a nombre de otra persona.
+function fijarConsultorDelUsuario() {
+  const control = document.getElementById("filterConsultant");
+  if (!control) return;
+  control.disabled = !state.isAdmin;
+  if (state.isAdmin) return;
+  const mio = [...control.options].find(opcion => opcion.value && norm(opcion.value) === norm(state.me?.displayName));
+  control.value = mio ? mio.value : "";
 }
 
 function collectFilters() {
@@ -690,7 +726,7 @@ function collectFilters() {
     from: document.getElementById("filterFrom").value,
     to: document.getElementById("filterTo").value,
     client: document.getElementById("filterClient").value,
-    consultant: document.getElementById("filterConsultant").value,
+    consultant: state.isAdmin ? document.getElementById("filterConsultant").value : "",
     requirement: document.getElementById("filterRequirement").value,
     activity: document.getElementById("filterActivity").value
   };
@@ -733,15 +769,10 @@ function groupBy(records, keyFn) {
 function updateAll() {
   state.filters = collectFilters();
   const rows = applyFilters(state.records);
-  renderSummary(rows);
-  renderClients(rows);
-  renderConsultants(rows);
+  renderConsultants();
   renderApproval(rows);
   renderDiagnostico();
-  if (state.isAdmin) {
-    renderClientBilling(rows);
-    renderCollabBilling(rows);
-  }
+  if (state.isAdmin) renderCollabBilling(rows);
 }
 
 function renderSummary(rows) {
@@ -866,7 +897,8 @@ function focusTotals(rows, consultor) {
     if (!asignadoA || norm(asignadoA) === norm(horasDe)) propias.push(record);
     else ajenas.push(record);
   });
-  return { propias: sum(propias), ajenas: sum(ajenas), nPropias: propias.length, nAjenas: ajenas.length };
+  return { propias: sum(propias), ajenas: sum(ajenas), nPropias: propias.length, nAjenas: ajenas.length,
+           filas: { total: [...propias, ...ajenas], propias, ajenas } };
 }
 
 function renderConsultantFocus() {
@@ -879,19 +911,68 @@ function renderConsultantFocus() {
   const elegido = state.filters.consultant || "";
   const t = focusTotals(applyFilters(state.records, { consultant: "" }), elegido);
   const registros = n => `${n} ${n === 1 ? L("registro", "record") : L("registros", "records")}`;
-  const alcance = elegido || L("todos los consultores", "all consultants");
+  const alcance = alcanceActual();
   const kpis = [
-    [L("Total de horas trabajadas", "Total hours worked"), fmtHours(t.propias + t.ajenas), `${registros(t.nPropias + t.nAjenas)} · ${alcance}`],
-    [L("Horas trabajadas asignadas a mí", "Hours worked assigned to me"), fmtHours(t.propias), L(`${registros(t.nPropias)} a nombre propio`, `${registros(t.nPropias)} under their own name`)],
-    [L("Horas trabajadas asignadas a otros", "Hours worked assigned to others"), fmtHours(t.ajenas), L(`${registros(t.nAjenas)} reportados a otro consultor`, `${registros(t.nAjenas)} reported under another consultant`)]
+    ["total",   L("Total de horas trabajadas", "Total hours worked"), fmtHours(t.propias + t.ajenas), `${registros(t.nPropias + t.nAjenas)} · ${alcance}`],
+    ["propias", L("Horas trabajadas asignadas a mí", "Hours worked assigned to me"), fmtHours(t.propias), L(`${registros(t.nPropias)} a nombre propio`, `${registros(t.nPropias)} under their own name`)],
+    ["ajenas",  L("Horas trabajadas asignadas a otros", "Hours worked assigned to others"), fmtHours(t.ajenas), L(`${registros(t.nAjenas)} reportados a otro consultor`, `${registros(t.nAjenas)} reported under another consultant`)]
   ];
-  mosaicos.innerHTML = kpis.map(([label, value, foot]) => `<div class="kpi"><span class="kpi__label">${esc(label)}</span><strong class="kpi__value">${esc(value)}</strong><span class="kpi__foot">${esc(foot)}</span></div>`).join("");
+  // Son botones: al pulsarlos se abre abajo el detalle de los registros que
+  // forman ese total, igual que al pulsar una barra de las graficas.
+  mosaicos.innerHTML = kpis.map(([clave, label, value, foot]) => `<button type="button" class="kpi kpi--link" data-focus="${clave}" aria-label="${esc(L(`Ver el detalle de ${label.toLowerCase()}`, `See the detail of ${label.toLowerCase()}`))}"><span class="kpi__label">${esc(label)}</span><strong class="kpi__value">${esc(value)}</strong><span class="kpi__foot">${esc(foot)}</span></button>`).join("");
 }
 
-function renderConsultants(rows) {
+// Detalle de un mosaico: los mismos registros que suman el numero mostrado.
+// Sobre quien se esta mirando: el consultor elegido en el filtro, o todos. Para
+// el consultor no hay eleccion posible, asi que es su propio nombre.
+function alcanceActual() {
+  return state.filters.consultant
+    || (state.isAdmin ? L("todos los consultores", "all consultants") : (state.me?.displayName || L("mis horas", "my hours")));
+}
+
+// Los mosaicos y las graficas ya no abren un panel aparte: llevan al reporte de
+// abajo con el filtro puesto. Asi solo existe una tabla y un solo sitio donde
+// mirar el detalle, y lo que se ve en pantalla es lo que sale impreso.
+function desplazarAlReporte() {
+  requestAnimationFrame(() => {
+    const destino = document.querySelector(".report-heading");
+    if (destino) destino.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
+function irAlReporte(filtros, aviso) {
+  state.reportFilters = filtros || {};
+  renderApproval();
+  desplazarAlReporte();
+  if (aviso) toast(aviso);
+}
+
+function showFocusDetail(tipo) {
+  const etiqueta = { propias: ASIGNACION_PROPIA(), ajenas: ASIGNACION_AJENA() }[tipo];
+  irAlReporte(etiqueta ? { assignment: [etiqueta] } : {},
+    etiqueta ? `${L("Reporte filtrado", "Filtered report")}: ${etiqueta}.`
+             : L("Reporte completo, sin filtros.", "Full report, no filters."));
+}
+
+
+// "Horas por consultor" mira el trabajo hecho, no el reportado: agrupa por la
+// columna "Horas de" y aplica el filtro global de consultor sobre esa misma
+// columna. Asi a cada quien le aparecen tambien las horas que trabajo y quedaron
+// reportadas a nombre de otra persona, que es justo lo que viene a revisar aqui.
+// Las demas secciones siguen con el nombre reportado, que es el que ve el cliente.
+function consultantRows() {
+  const elegido = state.filters.consultant || "";
+  return applyFilters(state.records, { consultant: "" })
+    .filter(record => !elegido || norm(quienTrabajo(record)) === norm(elegido));
+}
+
+function quienTrabajo(record) { return horasDeDe(record) || SIN_CONSULTOR(); }
+
+function renderConsultants() {
   renderConsultantFocus();
+  const rows = consultantRows();
   const total = sum(rows);
-  const items = [...groupBy(rows,r=>r.consultant || SIN_CONSULTOR())].map(([name,data])=>{
+  const items = [...groupBy(rows,quienTrabajo)].map(([name,data])=>{
     const capacity = capacityFor(name, state.filters.period || monthKey(data[0]?.date));
     const hours = sum(data); return { name, hours, capacity, available: capacity == null ? null : capacity-hours,
       clients:unique(data.map(r=>r.client)).length, requirements:unique(data.map(r=>r.requirement)).length, days:unique(data.map(r=>toISO(r.date))).length };
@@ -906,7 +987,7 @@ function renderConsultants(rows) {
     }
   },items.map(i=>[i.name,i.hours]));
   const clients = unique(rows.map(r=>r.client||SIN_CLIENTE())).sort();
-  const byConsultant = groupBy(rows,r=>r.consultant||SIN_CONSULTOR());
+  const byConsultant = groupBy(rows,quienTrabajo);
   const datasets = clients.map((client,i)=>({label:client,backgroundColor:APP.colors[i%APP.colors.length],data:items.map(item=>sum((byConsultant.get(item.name)||[]).filter(r=>(r.client||SIN_CLIENTE())===client))),borderWidth:0}));
   const mixFallback=items.flatMap(item=>clients.map(client=>{const hours=sum((byConsultant.get(item.name)||[]).filter(r=>(r.client||SIN_CLIENTE())===client));return hours?[`${item.name} · ${client}`,hours,{consultant:item.name,client}]:null;}).filter(Boolean));
   drawChart("consultantMixChart", {
@@ -919,50 +1000,46 @@ function renderConsultants(rows) {
       plugins:{...chartPlugins(),legend:{...chartPlugins().legend,onClick:(_event,legendItem,legend)=>selectConsultantClientFromLegend(legendItem,legend.chart)},tooltip:{mode:"nearest",axis:"xy",intersect:true,callbacks:{title:contexts=>{const context=contexts[0];return context?`${context.label} — ${context.dataset.label}`:"";},label:context=>`${L("Horas", "Hours")}: ${fmtHours(context.raw)} h`}}}
     }
   },mixFallback);
-  document.getElementById("consultantTableBody").innerHTML = items.length ? items.map(i=>`<tr><td><b>${esc(i.name)}</b></td><td class="num">${fmtHours(i.hours)}</td><td class="num">${total?(i.hours/total*100).toFixed(1):"0.0"}%</td><td class="num">${i.clients}</td><td class="num">${i.requirements}</td><td class="num">${i.days}</td><td class="num">${i.capacity==null?L("Pendiente", "Pending"):fmtHours(i.capacity)}</td><td class="num">${i.available==null?"—":fmtHours(i.available)}</td><td>${i.capacity?`<span class="progress-line"><span><i style="width:${Math.min(100,i.hours/i.capacity*100)}%"></i></span><b>${(i.hours/i.capacity*100).toFixed(1)}%</b></span>`:L("Sin configurar", "Not set")}</td></tr>`).join("") : emptyRow(9);
-  if(state.selectedConsultant&&items.some(item=>item.name===state.selectedConsultant)){
-    const selectedRows=byConsultant.get(state.selectedConsultant)||[];
-    if(state.selectedConsultantClient&&!selectedRows.some(r=>(r.client||SIN_CLIENTE())===state.selectedConsultantClient))state.selectedConsultantClient="";
-    renderConsultantDetail(state.selectedConsultant,state.selectedConsultantClient,rows);
-  }else hideConsultantDetail();
 }
 
 function consultantElementFromPointer(event,chart,axis="xy") {
   return chart?.getElementsAtEventForMode(event,"nearest",{axis,intersect:true},false)?.[0]||null;
 }
 
-function showConsultantDetail(consultant,client="",rows=applyFilters(state.records)) {
-  const matches=rows.filter(r=>(r.consultant||SIN_CONSULTOR())===consultant&&(!client||(r.client||SIN_CLIENTE())===client));
-  if(!matches.length){toast(L(`No hay horas de ${consultant}${client?` para ${client}`:""} con los filtros actuales.`, `No hours for ${consultant}${client?` for ${client}`:""} with the current filters.`));return;}
-  state.selectedConsultant=consultant;
-  state.selectedConsultantClient=client;
-  renderConsultantDetail(consultant,client,rows);
-  requestAnimationFrame(()=>document.getElementById("consultantDetailPanel").scrollIntoView({behavior:"smooth",block:"start"}));
-  toast(L(`Detalle de ${consultant}${client?` · ${client}`:""}: ${matches.length} registros.`, `${consultant}${client?` · ${client}`:""} detail: ${matches.length} records.`));
+// La leyenda de "Distribucion por cliente" y sus barras llevan al reporte
+// filtrado por ese cliente; las barras de "Horas registradas", al reporte
+// completo. Es lo que pidio el uso real: de la grafica al documento, sin escalas.
+function irAlReportePorCliente(client) {
+  if (!client) return;
+  irAlReporte({ client: [client] }, `${L("Reporte filtrado por cliente", "Report filtered by client")}: ${client}.`);
 }
 
-function renderConsultantDetail(consultant,client,rows) {
-  const detail=rows.filter(r=>(r.consultant||SIN_CONSULTOR())===consultant&&(!client||(r.client||SIN_CLIENTE())===client)).sort((a,b)=>a.date-b.date||a.client.localeCompare(b.client,"es")||a.requirement.localeCompare(b.requirement,"es",{numeric:true}));
-  if(!detail.length)return hideConsultantDetail();
-  const panel=document.getElementById("consultantDetailPanel");
-  document.getElementById("consultantDetailTitle").textContent=L("Reporte de horas", "Hours report")+(client?` — ${consultant} · ${client}`:` — ${consultant}`);
-  document.getElementById("consultantDetailMeta").textContent=L(`${detail.length} registros · ${fmtHours(sum(detail))} h · según los filtros de análisis`, `${detail.length} records · ${fmtHours(sum(detail))} h · per the analysis filters`);
-  document.getElementById("consultantDetailBody").innerHTML=detail.map(r=>`<tr><td><b>${esc(r.client||SIN_CLIENTE())}</b></td><td>${formatDate(r.date)}</td><td>${esc(r.requirement)}</td><td>${esc(r.consultant||SIN_CONSULTOR())}</td><td>${esc(r.activity)}</td><td>${esc(r.note)}</td><td class="num">${fmtHours(r.hours)}</td></tr>`).join("");
-  panel.hidden=false;
-}
-
-function hideConsultantDetail() {
-  state.selectedConsultant="";
-  state.selectedConsultantClient="";
-  const panel=document.getElementById("consultantDetailPanel");
-  panel.hidden=true;
-  document.getElementById("consultantDetailBody").innerHTML="";
+// Un segmento de "Distribucion por cliente" cruza dos cosas: quien trabajo las
+// horas (la barra) y para que cliente fueron (el color). Al pulsarlo el reporte
+// tiene que quedar con las dos. El consultor va al filtro global y no al control
+// de la columna a proposito: el filtro global mira "Horas de", igual que la
+// grafica, asi que conserva las horas que la persona trabajo y quedaron
+// reportadas a nombre de otra. Filtrar la columna Consultor, que muestra el
+// nombre reportado, borraria justo esas y el total dejaria de cuadrar con el
+// segmento. El cliente si va al control de la columna, como ya lo hacia.
+// Al consultor no administrador el filtro global ya le viene fijado en su
+// nombre, asi que para el solo cambia el cliente.
+function irAlReportePorConsultorYCliente(consultant, client) {
+  if (!client) return;
+  const control = document.getElementById("filterConsultant");
+  const opcion = (state.isAdmin && consultant && control)
+    ? [...control.options].find(o => o.value && norm(o.value) === norm(consultant))
+    : null;
+  if (!opcion) { irAlReportePorCliente(client); return; }
+  control.value = opcion.value;
+  state.reportFilters = { client: [client] };
+  updateAll();
+  desplazarAlReporte();
+  toast(`${L("Reporte filtrado", "Filtered report")}: ${opcion.value} · ${client}.`);
 }
 
 function selectConsultantClientFromLegend(legendItem,chart) {
-  const client=chart?.data?.datasets?.[legendItem.datasetIndex]?.label||"";
-  if(!state.selectedConsultant)return toast(L("Selecciona primero la barra de un consultor.", "First select a consultant's bar."));
-  showConsultantDetail(state.selectedConsultant,client);
+  irAlReportePorCliente(chart?.data?.datasets?.[legendItem.datasetIndex]?.label || "");
 }
 
 function capacityFor(name, period) {
@@ -1031,7 +1108,9 @@ function logoDeFormato(formato) { return window.ESTIMACION_LOGOS?.[formato.logo]
 function populateApprovalFormats() {
   const control = document.getElementById("approvalFormat");
   if (!control) return;
-  const opciones = unique(["CLARILIUM", ...(state.catalogs.formats || [])]);
+  // El consultor no elige formato: sus reportes salen siempre en el de
+  // CLARILIUM, que es quien emite el documento.
+  const opciones = state.isAdmin ? unique(["CLARILIUM", ...(state.catalogs.formats || [])]) : ["CLARILIUM"];
   if (!opciones.some(nombre => norm(nombre) === norm(state.approvalFormat))) state.approvalFormat = opciones[0];
   control.innerHTML = opciones.map(nombre => `<option value="${esc(nombre)}">${esc(nombre)}</option>`).join("");
   control.value = state.approvalFormat;
@@ -1049,45 +1128,239 @@ function aplicarFormatoImpresion() {
   if (imagen && logo) { imagen.src = logo.src; imagen.alt = state.approvalFormat; }
 }
 
-function approvalRows() {
-  return applyFilters(state.records);
+/* ------------------------------------------------------------------ *
+ * El reporte mensual: columnas, filtros y orden.
+ *
+ * Es la unica tabla de detalle del tablero. Cada columna trae su control de
+ * orden y de filtro; los filtros de columnas distintas se suman, y el orden
+ * convive con ellos. El agrupado por cliente con su linea de subtotal no se
+ * pierde nunca: el orden elegido manda dentro de cada grupo, y sobre el orden
+ * de los grupos solo cuando se ordena por cliente.
+ * ------------------------------------------------------------------ */
+const ASIGNACION_PROPIA = () => L("A nombre propio", "Under own name");
+const ASIGNACION_AJENA  = () => L("A nombre de otro", "Under another name");
+
+function esAsignacionPropia(record) {
+  const horasDe = horasDeDe(record), asignadoA = asignadoADe(record);
+  return !asignadoA || norm(asignadoA) === norm(horasDe);
 }
 
-function approvalData(rows=approvalRows()) {
-  const sorted=[...rows].sort((a,b)=>(a.client||"").localeCompare(b.client||"","es",{numeric:true})||a.date-b.date||a.requirement.localeCompare(b.requirement,"es",{numeric:true})||a.consultant.localeCompare(b.consultant,"es"));
-  return {
-    headers:[L("Cliente","Client"),L("Fecha","Date"),L("Requerimiento","Requirement"),L("Consultor","Consultant"),L("Actividad","Activity"),L("Nota","Note"),L("Horas","Hours")],
-    rows:sorted.map(r=>[r.client||SIN_CLIENTE(),formatDate(r.date),r.requirement,r.consultant,r.activity,r.note||"—",fmtHours(r.hours)]),
-    raw:sorted
-  };
+// "soloPantalla" no viaja al PDF ni al papel: sirve para filtrar aqui, pero el
+// documento que recibe el cliente no lleva esa columna.
+const REPORT_COLS = [
+  { key:"client",      etiqueta:()=>L("Cliente","Client"),            valor:r=>r.client||SIN_CLIENTE() },
+  { key:"date",        etiqueta:()=>L("Fecha","Date"),                valor:r=>formatDate(r.date), orden:r=>toISO(r.date) },
+  { key:"requirement", etiqueta:()=>L("Requerimiento","Requirement"), valor:r=>String(r.requirement) },
+  { key:"consultant",  etiqueta:()=>L("Consultor","Consultant"),      valor:r=>r.consultant||SIN_CONSULTOR() },
+  { key:"assignment",  etiqueta:()=>L("Asignación","Assignment"),     valor:r=>esAsignacionPropia(r)?ASIGNACION_PROPIA():ASIGNACION_AJENA(), soloPantalla:true },
+  { key:"activity",    etiqueta:()=>L("Actividad","Activity"),        valor:r=>r.activity },
+  { key:"note",        etiqueta:()=>L("Nota","Note"),                 valor:r=>r.note||"—" },
+  { key:"hours",       etiqueta:()=>L("Horas","Hours"),               valor:r=>fmtHours(r.hours), orden:r=>r.hours, num:true }
+];
+
+const columnaReporte = clave => REPORT_COLS.find(col => col.key === clave);
+const columnasDocumento = () => REPORT_COLS.filter(col => !col.soloPantalla);
+function filtrosDeReporte() { return Object.entries(state.reportFilters || {}).filter(([, v]) => v && v.length); }
+function hayFiltrosDeReporte() { return filtrosDeReporte().length > 0; }
+
+// Orden natural del documento: cliente, fecha, requerimiento.
+function ordenNatural(a, b) {
+  return (a.client||"").localeCompare(b.client||"", "es", {numeric:true})
+    || a.date - b.date
+    || String(a.requirement).localeCompare(String(b.requirement), "es", {numeric:true});
+}
+
+// Al abrir el menu de una columna, sus valores se calculan con los filtros de
+// las OTRAS columnas aplicados: asi la lista solo ofrece lo que de verdad se
+// puede elegir, como en una hoja de calculo.
+function filasFiltradas(exceptoColumna) {
+  let filas = consultantRows();
+  filtrosDeReporte().forEach(([clave, valores]) => {
+    if (clave === exceptoColumna) return;
+    const col = columnaReporte(clave);
+    if (!col) return;
+    const permitidos = new Set(valores);
+    filas = filas.filter(r => permitidos.has(col.valor(r)));
+  });
+  return filas;
+}
+
+function approvalRows() { return filasFiltradas(); }
+
+function ordenarFilas(filas) {
+  const s = state.reportSort || {};
+  const col = s.key ? columnaReporte(s.key) : null;
+  if (!col) return [...filas].sort(ordenNatural);
+  const clave = col.orden || col.valor;
+  const dir = s.dir === "desc" ? -1 : 1;
+  return [...filas].sort((a, b) => {
+    const va = clave(a), vb = clave(b);
+    const cmp = (typeof va === "number" && typeof vb === "number")
+      ? va - vb
+      : String(va).localeCompare(String(vb), "es", {numeric:true});
+    return cmp * dir || ordenNatural(a, b);
+  });
 }
 
 function approvalGroups(rows=approvalRows()) {
-  const data=approvalData(rows);
-  return [...groupBy(data.raw,row=>row.client||SIN_CLIENTE())].map(([client,clientRows])=>({
-    client,
-    hours:sum(clientRows),
-    rows:clientRows.map(r=>[r.client||SIN_CLIENTE(),formatDate(r.date),r.requirement,r.consultant,r.activity,r.note||"—",fmtHours(r.hours)])
-  }));
+  const s = state.reportSort || {};
+  const dirCliente = (s.key === "client" && s.dir === "desc") ? -1 : 1;
+  return [...groupBy(rows, r => r.client || SIN_CLIENTE())]
+    .sort((a, b) => a[0].localeCompare(b[0], "es", {numeric:true}) * dirCliente)
+    .map(([client, filas]) => ({ client, hours: sum(filas), filas: ordenarFilas(filas) }));
 }
 
-function renderApproval(rows=approvalRows()) {
-  const totalLabel=`${fmtHours(sum(rows))} ${L("horas", "hours")}`;
-  document.getElementById("approvalDetailTotal").textContent=totalLabel;
-  document.getElementById("approvalDetailTotalFooter").textContent=totalLabel;
-  const groups=approvalGroups(rows);
-  document.getElementById("approvalDetailBody").innerHTML=groups.length
-    ? groups.map(group=>group.rows.map(row=>`<tr>${row.map((value,index)=>`<td class="${index===row.length-1?"num":""}">${esc(value)}</td>`).join("")}</tr>`).join("")+`<tr class="approval-client-total-row"><td colspan="7"><div class="approval-total-summary approval-overall-total approval-client-total-card"><b>${esc(L("Total de horas", "Total hours"))} ${esc(group.client)}</b><strong>${fmtHours(group.hours)} ${esc(L("horas", "hours"))}</strong></div></td></tr>`).join("")
-    : emptyRow(7);
+// Lo que se lleva el PDF: las mismas filas, en el mismo orden, sin las columnas
+// de pantalla.
+function approvalData(rows=approvalRows()) {
+  const cols = columnasDocumento();
+  const ordenadas = approvalGroups(rows).flatMap(grupo => grupo.filas);
+  return { headers: cols.map(col => col.etiqueta()), rows: ordenadas.map(r => cols.map(col => col.valor(r))), raw: ordenadas };
+}
+
+function renderApproval() {
+  const cuerpo = document.getElementById("approvalDetailBody");
+  if (!cuerpo) return;
+  const filas = approvalRows();
+  const etiquetaTotal = `${fmtHours(sum(filas))} ${L("horas", "hours")}`;
+  document.getElementById("approvalDetailTotal").textContent = etiquetaTotal;
+  document.getElementById("approvalDetailTotalFooter").textContent = etiquetaTotal;
+  pintarCabeceraReporte();
+  const grupos = approvalGroups(filas);
+  cuerpo.innerHTML = grupos.length
+    ? grupos.map(grupo =>
+        grupo.filas.map(r => `<tr>${REPORT_COLS.map(col => `<td class="${col.num?"num":""}${col.soloPantalla?" col-solo-pantalla":""}">${esc(col.valor(r))}</td>`).join("")}</tr>`).join("")
+        + `<tr class="approval-client-total-row"><td colspan="${REPORT_COLS.length}"><div class="approval-total-summary approval-overall-total approval-client-total-card"><b>${esc(L("Total de horas", "Total hours"))} ${esc(grupo.client)}</b><strong>${fmtHours(grupo.hours)} ${esc(L("horas", "hours"))}</strong></div></td></tr>`
+      ).join("")
+    : emptyRow(REPORT_COLS.length);
+}
+
+function pintarCabeceraReporte() {
+  const head = document.getElementById("approvalHead");
+  if (!head) return;
+  const s = state.reportSort || {};
+  head.innerHTML = `<tr>${REPORT_COLS.map(col => {
+    const activo = (state.reportFilters?.[col.key] || []).length > 0;
+    const flecha = s.key === col.key ? (s.dir === "desc" ? "↓" : "↑") : "";
+    const nombre = col.etiqueta();
+    return `<th class="${col.num?"num ":""}${col.soloPantalla?"col-solo-pantalla":""}"><span class="col-head">`
+      + `<span class="col-head__txt">${esc(nombre)}${flecha ? ` <i class="col-head__orden">${flecha}</i>` : ""}</span>`
+      + `<button type="button" class="col-head__btn${activo?" is-activa":""}" data-col="${col.key}" aria-haspopup="true" aria-expanded="false"`
+      + ` title="${esc(L("Ordenar y filtrar", "Sort and filter"))}" aria-label="${esc(L(`Ordenar y filtrar ${nombre}`, `Sort and filter ${nombre}`))}">▾</button>`
+      + `</span></th>`;
+  }).join("")}</tr>`;
+}
+
+/* --------- El menu de cada columna: orden y seleccion de valores ---------- */
+function cerrarMenuColumna() {
+  document.getElementById("colMenu")?.remove();
+  document.querySelectorAll(".col-head__btn[aria-expanded='true']").forEach(b => b.setAttribute("aria-expanded", "false"));
+}
+
+function abrirMenuColumna(boton) {
+  const clave = boton.dataset.col;
+  const col = columnaReporte(clave);
+  if (!col) return;
+  const abierto = document.getElementById("colMenu")?.dataset.col === clave;
+  cerrarMenuColumna();
+  if (abierto) return;
+  const valores = unique(filasFiltradas(clave).map(col.valor)).sort((a, b) => String(a).localeCompare(String(b), "es", {numeric:true}));
+  const elegidos = new Set(state.reportFilters?.[clave] || []);
+  const menu = document.createElement("div");
+  menu.className = "col-menu";
+  menu.id = "colMenu";
+  menu.dataset.col = clave;
+  menu.innerHTML = `
+    <div class="col-menu__orden">
+      <button type="button" data-orden="asc">${esc(L("Orden ascendente", "Sort ascending"))}</button>
+      <button type="button" data-orden="desc">${esc(L("Orden descendente", "Sort descending"))}</button>
+    </div>
+    <input type="search" class="col-menu__buscar" placeholder="${esc(L("Buscar…", "Search…"))}" aria-label="${esc(L("Buscar valores", "Search values"))}">
+    <div class="col-menu__lista">${valores.length
+      ? valores.map(v => `<label><input type="checkbox" value="${esc(v)}"${!elegidos.size || elegidos.has(v) ? " checked" : ""}><span>${esc(v)}</span></label>`).join("")
+      : `<p class="empty-cell">${esc(L("Sin valores", "No values"))}</p>`}</div>
+    <div class="col-menu__pie">
+      <button type="button" class="button button--ghost" data-accion="limpiar">${esc(L("Quitar filtro", "Clear filter"))}</button>
+      <button type="button" class="button button--primary" data-accion="aplicar">${esc(L("Aplicar", "Apply"))}</button>
+    </div>`;
+  document.body.appendChild(menu);
+  const caja = boton.getBoundingClientRect();
+  menu.style.top = `${Math.round(caja.bottom + 6)}px`;
+  menu.style.left = `${Math.round(Math.max(12, Math.min(caja.left, window.innerWidth - menu.offsetWidth - 12)))}px`;
+  boton.setAttribute("aria-expanded", "true");
+  menu.querySelector(".col-menu__buscar")?.focus();
+}
+
+function menuColumnaAccion(evento) {
+  const menu = evento.target.closest("#colMenu");
+  if (!menu) return;
+  const clave = menu.dataset.col;
+  const orden = evento.target.closest("[data-orden]");
+  if (orden) {
+    state.reportSort = { key: clave, dir: orden.dataset.orden };
+    cerrarMenuColumna();
+    renderApproval();
+    return;
+  }
+  const accion = evento.target.closest("[data-accion]")?.dataset.accion;
+  if (accion === "limpiar") {
+    const filtros = { ...state.reportFilters }; delete filtros[clave];
+    state.reportFilters = filtros;
+    cerrarMenuColumna();
+    renderApproval();
+    return;
+  }
+  if (accion === "aplicar") {
+    const casillas = [...menu.querySelectorAll(".col-menu__lista input[type=checkbox]")];
+    const marcadas = casillas.filter(c => c.checked).map(c => c.value);
+    const filtros = { ...state.reportFilters };
+    // Todas marcadas es lo mismo que no filtrar: se quita para no dejar un
+    // control encendido que en realidad no recorta nada.
+    if (!marcadas.length) { toast(L("Marca al menos un valor.", "Select at least one value.")); return; }
+    if (marcadas.length === casillas.length) delete filtros[clave]; else filtros[clave] = marcadas;
+    state.reportFilters = filtros;
+    cerrarMenuColumna();
+    renderApproval();
+  }
+}
+
+function menuColumnaBuscar(evento) {
+  const menu = evento.target.closest("#colMenu");
+  if (!menu || !evento.target.classList.contains("col-menu__buscar")) return;
+  const aguja = norm(evento.target.value);
+  menu.querySelectorAll(".col-menu__lista label").forEach(fila => {
+    fila.hidden = Boolean(aguja) && !norm(fila.textContent).includes(aguja);
+  });
+}
+
+// El aviso cambia segun el boton: quien pulsa tiene que saber si lo que va a
+// salir por la impresora o al archivo es el reporte completo o el recortado.
+function confirmarSalidaDelReporte(accion) {
+  const filas = approvalRows();
+  if (!filas.length) { toast(L("No hay datos en el reporte.", "The report has no data.")); return false; }
+  const base = consultantRows();
+  const horas = fmtHours(sum(filas)), horasBase = fmtHours(sum(base));
+  if (!hayFiltrosDeReporte()) {
+    return window.confirm(accion === "imprimir"
+      ? L(`Se imprimirá el reporte completo: ${filas.length} registros y ${horas} horas. ¿Continuar?`,
+          `The full report will be printed: ${filas.length} records and ${horas} hours. Continue?`)
+      : L(`Se descargará el reporte completo: ${filas.length} registros y ${horas} horas. ¿Continuar?`,
+          `The full report will be downloaded: ${filas.length} records and ${horas} hours. Continue?`));
+  }
+  const columnas = filtrosDeReporte().map(([clave]) => columnaReporte(clave)?.etiqueta()).filter(Boolean).join(", ");
+  return window.confirm(accion === "imprimir"
+    ? L(`Atención: el reporte tiene filtros aplicados (${columnas}), así que NO se imprimirán todos los registros. Saldrán ${filas.length} de ${base.length} registros, ${horas} de ${horasBase} horas. ¿Continuar?`,
+        `Warning: the report has filters applied (${columnas}), so NOT every record will be printed. ${filas.length} of ${base.length} records will be printed, ${horas} of ${horasBase} hours. Continue?`)
+    : L(`Atención: el reporte tiene filtros aplicados (${columnas}), así que NO se descargarán todos los registros. Saldrán ${filas.length} de ${base.length} registros, ${horas} de ${horasBase} horas. ¿Continuar?`,
+        `Warning: the report has filters applied (${columnas}), so NOT every record will be downloaded. ${filas.length} of ${base.length} records will be downloaded, ${horas} of ${horasBase} hours. Continue?`));
 }
 
 function exportApprovalPdf() {
+  if (!confirmarSalidaDelReporte("exportar")) return;
   const rows=approvalRows();
-  if (!rows.length) return toast(L("No hay datos para exportar.", "There is no data to export."));
   const data=approvalData(rows);
   const groups=approvalGroups(rows);
   const total=sum(rows);
-  if (!window.confirm(L(`Se exportará un reporte con ${fmtHours(total)} horas. ¿Continuar?`, `A report with ${fmtHours(total)} hours will be exported. Continue?`))) return;
   if (!window.jspdf?.jsPDF) return toast(L("La biblioteca PDF no está disponible.", "The PDF library is not available."));
   const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:"mm",format:"letter",orientation:"landscape"});
   const formato=formatoActual(); const logo=logoDeFormato(formato);
@@ -1110,8 +1383,9 @@ function exportApprovalPdf() {
   const drawTotal=(label,hours,y)=>{doc.setFillColor(...formato.banda);doc.rect(10,y,width-20,12,"F");doc.setFillColor(...formato.acento);doc.rect(10,y,2,12,"F");doc.setTextColor(...formato.bandaTexto);doc.setFontSize(10);doc.setFont("helvetica","bold");doc.text(label,16,y+8);doc.text(`${fmtHours(hours)} ${L("horas", "hours")}`,width-16,y+8,{align:"right"});doc.setFont("helvetica","normal");return y+18;};
   drawHeader();
   let y=drawTotal(L("Total de horas", "Total hours"),total,30);
+  const colsDoc=columnasDocumento();
   const pdfBody=groups.flatMap(group=>[
-    ...group.rows,
+    ...group.filas.map(r=>colsDoc.map(col=>col.valor(r))),
     [{content:`${L("Total de horas", "Total hours")} ${group.client}`,colSpan:6,styles:{fillColor:formato.banda,textColor:formato.bandaTexto,fontStyle:"bold",lineColor:formato.acento,lineWidth:{top:.2,bottom:.2,left:1.2}}},{content:`${fmtHours(group.hours)} ${L("horas", "hours")}`,styles:{fillColor:formato.banda,textColor:formato.bandaTexto,fontStyle:"bold",halign:"right",lineColor:formato.acento,lineWidth:{top:.2,right:.2,bottom:.2}}}]
   ]);
   doc.autoTable({head:[data.headers],body:pdfBody,startY:y,margin:{top:30,left:10,right:10,bottom:16},theme:"striped",headStyles:{fillColor:formato.tabla,textColor:255},alternateRowStyles:{fillColor:[247,247,248]},styles:{fontSize:7,cellPadding:2,overflow:"linebreak"},columnStyles:{0:{cellWidth:25},1:{cellWidth:22},2:{cellWidth:29},3:{cellWidth:31},4:{cellWidth:32},5:{cellWidth:"auto"},6:{cellWidth:16,halign:"right"}},rowPageBreak:"avoid",showHead:"everyPage",willDrawPage:drawHeader,didDrawPage:drawFooter});
@@ -1190,6 +1464,7 @@ function adjustmentSelect(current) {
   return [["none",L("Sin ajuste", "No adjustment")],["percent",L("Porcentaje", "Percentage")],["amount",L("Importe", "Amount")]].map(([value,label])=>`<option value="${value}"${value===current?" selected":""}>${label}</option>`).join("");
 }
 function renderRateTable(id,rates,type) {
+  if (!document.getElementById(id)) return;
   const names=type==="client"?unique([...state.catalogs.clients,...state.records.map(r=>r.client)]):unique([...state.catalogs.developers,...state.records.map(r=>r.consultant)]);
   document.getElementById(id).innerHTML=rates.length?rates.map(r=>`<tr data-rate-id="${esc(r.id)}" data-rate-type="${type}"><td><select data-field="name">${rateSelect(names.sort(),r.name)}</select></td><td><input data-field="rate" type="number" min="0" step="0.01" value="${esc(r.rate)}"></td><td><select data-field="currency">${rateSelect(["MXN","USD"],r.currency||"MXN")}</select></td><td><input data-field="vat" type="number" step="0.01" value="${esc(r.vat||0)}"></td><td><input data-field="adjustmentName" value="${esc(r.adjustmentName||"")}" placeholder="${esc(L("Retención/bono", "Withholding/bonus"))}"></td><td><select data-field="adjustmentType">${adjustmentSelect(r.adjustmentType||"none")}</select></td><td><input data-field="adjustmentValue" type="number" step="0.01" value="${esc(r.adjustmentValue||0)}"></td>${type==="collab"?`<td><input data-field="capacity" type="number" min="0" step="0.5" value="${esc(r.capacity||"")}"></td>`:""}<td><input data-field="from" type="date" value="${esc(r.from||"")}"></td><td><input data-field="to" type="date" value="${esc(r.to||"")}"></td><td><button class="remove-row" type="button" aria-label="${esc(L("Eliminar tarifa", "Remove rate"))}">×</button></td></tr>`).join(""):emptyRow(type==="collab"?11:10);
 }
@@ -1292,7 +1567,7 @@ async function refreshRemoteData({silent=false, force=false}={}) {
 function setView(view) {
   // Punto unico de navegacion: si la vista es de administrador y quien mira no
   // lo es, se cae al resumen. Cierra tambien las llamadas directas por consola.
-  if (!state.isAdmin && SECCIONES_ADMIN.includes(view)) view = "summary";
+  if (!state.isAdmin && SECCIONES_ADMIN.includes(view)) view = "consultants";
   document.querySelectorAll(".view").forEach(el=>el.classList.toggle("active",el.dataset.section===view));
   document.querySelectorAll(".nav-item").forEach(el=>el.classList.toggle("active",el.dataset.view===view));
   document.getElementById("sidebar").classList.remove("open");document.getElementById("menuToggle").setAttribute("aria-expanded","false");
@@ -1389,34 +1664,35 @@ function navigateToView(view) {
 
 function bindEvents() {
   document.querySelectorAll("[data-view]").forEach(el=>el.addEventListener("click",()=>navigateToView(el.dataset.view)));
-  document.getElementById("kpiGrid").addEventListener("click",e=>{const card=e.target.closest("[data-kpi-view]");if(card)navigateToView(card.dataset.kpiView);});
   document.getElementById("menuToggle").addEventListener("click",e=>{const open=document.getElementById("sidebar").classList.toggle("open");e.currentTarget.setAttribute("aria-expanded",String(open));});
   ["filterPeriod","filterFrom","filterTo","filterClient","filterConsultant","filterRequirement","filterActivity"].forEach(id=>document.getElementById(id).addEventListener("change",()=>{ajustarPeriodoYRango(id);updateAll();}));
   document.getElementById("clearFilters").addEventListener("click",resetFiltersToDefaults);
-  document.querySelector('[data-for="clientChart"]').addEventListener("click",e=>{const button=e.target.closest("[data-client]");if(button)showClientDetail(button.dataset.client);});
-  document.querySelector('[data-for="consultantChart"]').addEventListener("click",e=>{const button=e.target.closest("[data-consultant]");if(button)showConsultantDetail(button.dataset.consultant);});
-  document.querySelector('[data-for="consultantMixChart"]').addEventListener("click",e=>{const button=e.target.closest("[data-consultant][data-consultant-client]");if(button)showConsultantDetail(button.dataset.consultant,button.dataset.consultantClient);});
-  const clientChart=document.getElementById("clientChart");
-  clientChart.addEventListener("mousemove",e=>{const chart=state.charts.clientChart;if(chart)chart.canvas.style.cursor=clientIndexFromPointer(e,chart)>=0?"pointer":"default";});
-  clientChart.addEventListener("mouseleave",()=>{clientChart.style.cursor="default";});
-  clientChart.addEventListener("click",e=>{const chart=state.charts.clientChart;if(!chart)return;const index=clientIndexFromPointer(e,chart);if(index>=0)showClientDetail(chart.data.labels[index]);});
+  document.getElementById("consultantFocusKpis").addEventListener("click",e=>{const boton=e.target.closest("[data-focus]");if(boton)showFocusDetail(boton.dataset.focus);});
+  document.querySelector('[data-for="consultantChart"]').addEventListener("click",e=>{if(e.target.closest("[data-consultant]"))showFocusDetail("total");});
+  document.querySelector('[data-for="consultantMixChart"]').addEventListener("click",e=>{const button=e.target.closest("[data-consultant-client]");if(button)irAlReportePorConsultorYCliente(button.dataset.consultant,button.dataset.consultantClient);});
   const consultantChart=document.getElementById("consultantChart");
   consultantChart.addEventListener("mousemove",e=>{const chart=state.charts.consultantChart;if(chart)chart.canvas.style.cursor=consultantElementFromPointer(e,chart,"x")?"pointer":"default";});
   consultantChart.addEventListener("mouseleave",()=>{consultantChart.style.cursor="default";});
-  consultantChart.addEventListener("click",e=>{const chart=state.charts.consultantChart;if(!chart)return;const element=consultantElementFromPointer(e,chart,"x");if(element)showConsultantDetail(chart.data.labels[element.index]);});
+  consultantChart.addEventListener("click",e=>{const chart=state.charts.consultantChart;if(!chart)return;if(consultantElementFromPointer(e,chart,"x"))showFocusDetail("total");});
   const consultantMixChart=document.getElementById("consultantMixChart");
   consultantMixChart.addEventListener("mousemove",e=>{const chart=state.charts.consultantMixChart;if(chart)chart.canvas.style.cursor=consultantElementFromPointer(e,chart,"xy")?"pointer":"default";});
   consultantMixChart.addEventListener("mouseleave",()=>{consultantMixChart.style.cursor="default";});
-  consultantMixChart.addEventListener("click",e=>{const chart=state.charts.consultantMixChart;if(!chart)return;const element=consultantElementFromPointer(e,chart,"xy");if(!element)return;const consultant=chart.data.labels[element.index];const client=chart.data.datasets[element.datasetIndex]?.label;if(consultant&&client)showConsultantDetail(consultant,client);});
+  consultantMixChart.addEventListener("click",e=>{const chart=state.charts.consultantMixChart;if(!chart)return;const element=consultantElementFromPointer(e,chart,"xy");if(!element)return;irAlReportePorConsultorYCliente(chart.data.labels[element.index]||"",chart.data.datasets[element.datasetIndex]?.label||"");});
   document.getElementById("approvalFormat").addEventListener("change",event=>{
     state.approvalFormat=event.target.value;
     aplicarFormatoImpresion();
   });
   document.getElementById("pdfApproval").addEventListener("click",exportApprovalPdf);
-  document.getElementById("printApproval").addEventListener("click",()=>{const rows=approvalRows();if(!rows.length)return toast(L("No hay datos para imprimir.", "There is no data to print."));if(!window.confirm(L(`Se imprimirá un reporte con ${fmtHours(sum(rows))} horas. ¿Continuar?`, `A report with ${fmtHours(sum(rows))} hours will be printed. Continue?`)))return;aplicarFormatoImpresion();window.print();});
-  document.getElementById("addClientRate").addEventListener("click",()=>addRate("client"));
+  // Menus de columna del reporte: abrir, elegir y cerrar.
+  document.getElementById("approvalHead").addEventListener("click",e=>{const boton=e.target.closest(".col-head__btn");if(boton)abrirMenuColumna(boton);});
+  document.addEventListener("click",e=>{if(!e.target.closest("#colMenu")&&!e.target.closest(".col-head__btn"))cerrarMenuColumna();else menuColumnaAccion(e);});
+  document.addEventListener("input",menuColumnaBuscar);
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")cerrarMenuColumna();});
+  window.addEventListener("resize",cerrarMenuColumna);
+  document.getElementById("printApproval").addEventListener("click",()=>{if(!confirmarSalidaDelReporte("imprimir"))return;aplicarFormatoImpresion();window.print();});
   document.getElementById("addCollabRate").addEventListener("click",()=>addRate("collab"));
-  ["clientRatesBody","collabRatesBody"].forEach(id=>{const body=document.getElementById(id);body.addEventListener("change",rateEditorChange);body.addEventListener("click",rateEditorRemove);});
+  // La tabla de tarifas de cliente se fue con la seccion de facturacion a clientes.
+  ["clientRatesBody","collabRatesBody"].forEach(id=>{const body=document.getElementById(id);if(!body)return;body.addEventListener("change",rateEditorChange);body.addEventListener("click",rateEditorRemove);});
   document.getElementById("collabSource").value=state.collaboratorSource;
   document.getElementById("collabSource").addEventListener("change",e=>{state.collaboratorSource=e.target.value;saveStorage();updateAll();});
   document.getElementById("manualAssignmentsBody").addEventListener("change",e=>{if(!e.target.classList.contains("manual-select"))return;state.manualAssignments[e.target.closest("tr").dataset.recordId]=e.target.value;saveStorage();updateAll();});
@@ -1492,6 +1768,15 @@ async function iniciar() {
     state.isAdmin = true;            // en demo se ve todo, para revisar el diseño
     applyRoleVisibility();
     await refreshRemoteData({ force: true });
+    // El banner dice en voz alta en que rol se esta ensayando y como cambiarlo:
+    // sin eso es facil revisar media hora la pantalla equivocada.
+    const banner = document.getElementById("demoBanner");
+    banner.removeAttribute("data-en");
+    banner.textContent = state.isAdmin
+      ? L("MODO DEMO · datos de ejemplo. Estás viendo la página como ADMINISTRADOR. Agrega ?rol=consultor al final de la dirección para verla como consultor.",
+          "DEMO MODE · sample data. You are seeing the page as ADMINISTRATOR. Add ?rol=consultor to the end of the address to see it as a consultant.")
+      : L(`MODO DEMO · datos de ejemplo. Estás viendo la página como CONSULTOR (${state.me?.displayName}). Quita ?rol=consultor de la dirección para volver a administrador.`,
+          `DEMO MODE · sample data. You are seeing the page as CONSULTANT (${state.me?.displayName}). Remove ?rol=consultor from the address to go back to administrator.`);
     return;
   }
 

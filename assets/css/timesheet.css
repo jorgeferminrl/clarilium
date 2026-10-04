@@ -1,4 +1,4 @@
-:root{--timesheet-version:"2026.09.28-1";}
+:root{--timesheet-version:"2026.09.30-9";}
 :root {
   --clarilium-night: #040814;
   --clarilium-navy: #0D1728;
@@ -139,6 +139,30 @@ tbody tr.clickable:hover { background: rgba(148,64,255,.08); cursor: pointer; }
 .progress-line { min-width: 140px; display: flex; align-items: center; gap: 8px; }
 .progress-line span { width: 76px; height: 8px; border-radius: 99px; background: var(--border); overflow: hidden; }
 .progress-line i { display: block; height: 100%; background: var(--clarilium-purple); border-radius: inherit; }
+/* ---- Controles de cada columna del reporte: orden y filtro ---- */
+.col-head { display: flex; align-items: center; gap: 6px; justify-content: space-between; }
+.num .col-head { justify-content: flex-end; }
+.col-head__txt { white-space: nowrap; }
+.col-head__orden { font-style: normal; opacity: .9; }
+.col-head__btn { flex: none; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 4px; background: rgba(255,255,255,.14); color: inherit; font: inherit; font-size: .7rem; line-height: 1; cursor: pointer; }
+.col-head__btn:hover { background: rgba(255,255,255,.3); }
+.col-head__btn.is-activa { background: var(--clarilium-purple); color: #fff; }
+.col-head__btn.is-activa::after { content: "●"; font-size: .5rem; margin-left: 1px; }
+
+.col-menu { position: fixed; z-index: 1200; width: 268px; max-width: calc(100vw - 24px); padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); box-shadow: 0 18px 44px rgba(13,23,40,.22); display: grid; gap: 10px; }
+.col-menu__orden { display: grid; gap: 4px; }
+.col-menu__orden button { width: 100%; text-align: left; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; font-size: .84rem; padding: 7px 9px; cursor: pointer; }
+.col-menu__orden button:hover { background: rgba(148,64,255,.12); }
+.col-menu__buscar { width: 100%; min-height: 34px; }
+.col-menu__lista { max-height: 210px; overflow: auto; display: grid; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: 7px; }
+.col-menu__lista label { display: flex; align-items: center; gap: 8px; padding: 5px 7px; border-radius: 5px; font-size: .84rem; font-weight: 400; color: var(--text); cursor: pointer; }
+.col-menu__lista label:hover { background: rgba(148,64,255,.1); }
+.col-menu__lista input { width: 16px; min-height: 16px; accent-color: var(--clarilium-purple); }
+.col-menu__lista span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-menu__pie { display: flex; justify-content: space-between; gap: 8px; }
+.col-menu__pie .button { min-height: 34px; font-size: .82rem; }
+.report-heading { margin-top: 6px; }
+
 /* Paleta del formato del reporte mensual. El atributo lo pone el JS al elegir
    en el desplegable "Formato"; el PDF usa la misma paleta desde timesheet.js. */
 body { --fmt-barra: #040814; --fmt-acento: #9440FF; --fmt-banda: #F3EAFF; --fmt-banda-texto: #0D1728; --fmt-tabla: #0D1728; }
@@ -146,6 +170,8 @@ body[data-formato="dxgrow"] { --fmt-barra: #2B2E31; --fmt-acento: #B7C40B; --fmt
 
 .formato-picker { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--muted); font-size: .8rem; font-weight: 750; white-space: nowrap; }
 .formato-picker select { width: auto; min-width: 156px; min-height: 40px; }
+/* label trae display, que le gana al atributo hidden de data-solo-admin. */
+.formato-picker[hidden] { display: none; }
 
 /* Cabecera que solo existe en el papel: replica la del PDF. */
 .print-header { display: none; }
@@ -158,8 +184,9 @@ body[data-formato="dxgrow"] { --fmt-barra: #2B2E31; --fmt-acento: #B7C40B; --fmt
 .approval-detail-table th:nth-child(2), .approval-detail-table td:nth-child(2) { width: 120px; }
 .approval-detail-table th:nth-child(3), .approval-detail-table td:nth-child(3) { width: 150px; }
 .approval-detail-table th:nth-child(4), .approval-detail-table td:nth-child(4) { width: 165px; }
-.approval-detail-table th:nth-child(5), .approval-detail-table td:nth-child(5) { width: 160px; }
-.approval-detail-table th:nth-child(6), .approval-detail-table td:nth-child(6) { min-width: 330px; white-space: normal; }
+.approval-detail-table th:nth-child(5), .approval-detail-table td:nth-child(5) { width: 150px; }
+.approval-detail-table th:nth-child(6), .approval-detail-table td:nth-child(6) { width: 160px; }
+.approval-detail-table th:nth-child(7), .approval-detail-table td:nth-child(7) { min-width: 300px; white-space: normal; }
 .approval-detail-table .approval-client-total-row { background: transparent; }
 .approval-detail-table .approval-client-total-row > td { padding: 0; border-bottom: 0; }
 .approval-total-summary { width: 100%; min-height: 68px; padding: 17px 14px 17px 28px; background: rgba(148,64,255,.11); border-left: 6px solid var(--clarilium-purple); display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: center; gap: 24px; color: var(--text); font-size: 1rem; }
@@ -266,10 +293,14 @@ body.dark .alert--warning { color: #ffd77b; background: #3b2a05; border-color: #
 @media print {
   @page { margin: 12mm; size: landscape; }
   body { background: #fff; }
-  .topbar, .sidebar, .filter-panel, .section-heading, .toast, .demo-banner, .skip-link, .view:not(#view-approval) { display: none !important; }
+  .topbar, .sidebar, .filter-panel, .section-heading, .toast, .demo-banner, .skip-link, .view:not(#view-consultants) { display: none !important; }
+  /* Del Resumen general solo se imprime el reporte: los mosaicos, las gráficas
+     y la tabla de consultores son herramientas de pantalla, no del documento.
+     La columna de asignación tampoco va: el cliente no tiene por qué verla. */
+  .consultant-focus, #view-consultants .chart-grid, #consultantSummaryPanel, .col-head__btn, .col-solo-pantalla, .col-menu { display: none !important; }
   .app-shell { display: block; }
   .main { max-width: none; padding: 0; }
-  #view-approval { display: block !important; }
+  #view-consultants { display: block !important; }
   .approval-report { display: block; }
   .approval-overall-total { margin-bottom: 8mm; }
   .approval-detail-panel { margin-bottom: 8mm; border: 0; box-shadow: none; }
